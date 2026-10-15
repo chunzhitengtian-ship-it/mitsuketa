@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="世界のどこかから届いた名前のない手紙。質問カードで82億人を減らして、差出人を見つけ出すWebゲーム。">
+<meta property="og:title" content="ミツケタ ─ 82億人のかくれんぼ">
+<meta property="og:description" content="理論上は、33問で82億人から誰でも見つけられる。あなたは何問で？">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
+<title>ミツケタ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 夜の地球（灯り）を主役に、その下に手札。広い画面では左に地球、右に手札。単一の夜テーマ。 */
+:root {
+  color-scheme: dark;
+  --night: #090e1d;
+  --night-2: #10172b;
+  --night-3: #18213b;
+  --line: #27304d;
+  --ink: #ebe5d5;
+  --muted: #9097ad;
+  --lamp: #ffc764;
+  --lamp-soft: #ffe2a6;
+  --paper: #f2e9d3;
+  --paper-2: #e6dabd;
+  --paper-ink: #1d2236;
+  --paper-muted: #6b6a73;
+  --yes: #86d8ae;
+  --no: #f2917f;
+  --geo: #3d6fb0;
+  --kuni: #7a5aa8;
+  --hito: #b0623b;
+  --kurashi: #3e8a6b;
+  --tanjo: #a8853a;
+  --f-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--night); }
+body { color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.app { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 28px; display: flex; flex-direction: column; gap: 14px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-weight: 900; font-size: 30px; letter-spacing: .06em; color: var(--lamp-soft); text-shadow: 0 0 18px rgba(255, 199, 100, .35); }
+.brand .sub { color: var(--muted); font-size: 13px; letter-spacing: .08em; }
+.modes { display: flex; gap: 6px; align-items: center; }
+.modes button { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.modes button.on { border-color: var(--lamp); color: var(--lamp-soft); }
+.modes #helpBtn { width: 34px; padding: 6px 0; font-weight: 700; }
+
+.grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; } .stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); } }
+.stage, .play { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.sky { position: relative; width: 100%; aspect-ratio: 16 / 9.4; max-width: 100%; border-radius: 14px; overflow: hidden; background: radial-gradient(120% 90% at 50% 40%, #121b36 0%, var(--night) 70%); border: 1px solid var(--line); }
+.sky canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#glow { filter: blur(6px); opacity: .85; mix-blend-mode: screen; }
+.hud { position: absolute; left: 14px; top: 10px; right: 14px; pointer-events: none; display: flex; flex-direction: column; gap: 0; }
+.phase { font-family: var(--f-display); font-weight: 700; font-size: 12px; letter-spacing: .2em; color: var(--muted); }
+.count { font-family: var(--f-display); font-weight: 900; font-size: clamp(24px, 6vw, 38px); line-height: 1.15; color: var(--lamp-soft); text-shadow: 0 0 14px rgba(255, 199, 100, .3); font-variant-numeric: tabular-nums; }
+.per { font-size: 12px; color: var(--muted); text-shadow: 0 0 6px var(--night), 0 0 6px var(--night); }
+.phase, .count { text-shadow: 0 0 10px var(--night); }
+.toast { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(16, 23, 43, .92); border: 1px solid var(--lamp); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--lamp-soft); }
+.toast b { color: var(--lamp); }
+
+.meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.meter div { background: var(--night-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+.meter .k { font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+.meter b { font-family: var(--f-num); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meter .warn b { color: var(--no); }
+
+.crowd { background: var(--night-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 480px) { .crowd { grid-template-columns: 1fr; } }
+.crowd h3 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .1em; }
+.crow { display: grid; grid-template-columns: 7.5em 1fr 3em; gap: 6px; align-items: center; font-size: 12px; }
+.crow + .crow { margin-top: 3px; }
+.crow .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 6px; background: var(--night-3); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--lamp); border-radius: 3px; }
+.crow .pc { text-align: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; color: var(--muted); }
+.ages { display: flex; align-items: flex-end; gap: 3px; height: 46px; }
+.ages i { flex: 1; background: var(--lamp); opacity: .75; border-radius: 2px 2px 0 0; min-height: 1px; }
+.agel { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.urb { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.urb .bar { margin-top: 3px; }
+
+.answer { background: var(--night-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 84px; }
+.answer .aq { font-size: 13px; color: var(--muted); }
+.answer .av { font-family: var(--f-display); font-weight: 900; font-size: 26px; line-height: 1.3; }
+.answer .av.yes { color: var(--yes); }
+.answer .av.no { color: var(--no); }
+.answer .ad { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.answer .ad b { color: var(--ink); font-family: var(--f-num); font-weight: 600; }
+
+.handHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.handHead h2 { margin: 0; font-family: var(--f-display); font-size: 16px; letter-spacing: .1em; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.ghost:hover:not(:disabled) { border-color: var(--muted); color: var(--ink); }
+.ghost:disabled { opacity: .4; cursor: default; }
+
+.hand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 420px) { .hand { grid-template-columns: 1fr; gap: 6px; } .hand .qwrap { flex-direction: row; } .hand .qcard { min-height: 0; border-radius: 10px 0 0 10px; padding: 8px 10px; } .hand .pin { border-radius: 0 10px 10px 0; border-top: 0; border-left: 1px dashed rgba(29,34,54,.2); flex: 0 0 4.8em; } }
+.qwrap { display: flex; flex-direction: column; min-width: 0; }
+.qcard { flex: 1; text-align: left; background: var(--paper); color: var(--paper-ink); border: 0; border-radius: 10px 10px 0 0; padding: 10px 10px 12px; display: flex; flex-direction: column; gap: 4px; min-height: 118px; box-shadow: 0 2px 0 var(--paper-2) inset; transition: transform .12s ease, box-shadow .12s ease; }
+.qcard:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, .35); }
+.qcard:disabled { opacity: .45; cursor: default; }
+.qwrap.solo .qcard { border-radius: 10px; }
+.tag { align-self: flex-start; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; color: #fff; border-radius: 4px; padding: 1px 6px; }
+.tag.地理 { background: var(--geo); } .tag.国 { background: var(--kuni); } .tag.人 { background: var(--hito); } .tag.くらし { background: var(--kurashi); } .tag.誕生 { background: var(--tanjo); }
+.qcard .qq { font-weight: 700; font-size: 14.5px; line-height: 1.45; text-wrap: pretty; }
+.qcard .qh { font-size: 11.5px; color: var(--paper-muted); line-height: 1.4; }
+.qcard .cost { margin-top: auto; font-size: 11px; color: var(--hito); font-weight: 700; }
+.pin { border: 0; background: var(--paper-2); color: var(--paper-ink); border-radius: 0 0 10px 10px; font-size: 12px; padding: 5px 8px; border-top: 1px dashed rgba(29, 34, 54, .2); }
+.pin[aria-pressed="true"] { background: var(--lamp); font-weight: 700; }
+.holdRow { display: flex; gap: 10px; align-items: stretch; }
+.holdRow .lbl { flex: 0 0 auto; writing-mode: vertical-rl; font-size: 11px; color: var(--muted); letter-spacing: .3em; border-right: 1px dashed var(--line); padding-right: 6px; }
+.hold { flex: 1; min-width: 0; }
+.hold .empty { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: var(--muted); height: 100%; display: flex; align-items: center; }
+.hold .qwrap { max-width: 260px; }
+.notice { background: rgba(242, 145, 127, .12); border: 1px solid var(--no); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+
+.lineup { display: flex; flex-direction: column; gap: 8px; }
+.lineup h2 { margin: 0; font-family: var(--f-display); font-size: 16px; letter-spacing: .1em; color: var(--lamp-soft); }
+.lineup p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.person { text-align: left; background: var(--night-3); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: grid; grid-template-columns: 18px 1fr; gap: 2px 8px; align-items: start; transition: opacity .4s, border-color .2s; }
+.person:hover:not(:disabled) { border-color: var(--lamp); }
+.person .dot { grid-row: span 2; width: 14px; height: 14px; border-radius: 50%; background: var(--lamp); box-shadow: 0 0 10px var(--lamp); margin-top: 3px; }
+.person .pn { font-weight: 700; font-size: 13.5px; line-height: 1.35; }
+.person .pd { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.person:disabled { opacity: .28; cursor: default; }
+.person:disabled .dot { background: var(--muted); box-shadow: none; }
+.person.miss .pn::after { content: "（ちがった）"; color: var(--no); font-weight: 400; font-size: 11px; }
+
+details.log { background: var(--night-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+details.log summary { font-size: 13px; color: var(--muted); cursor: pointer; }
+details.log ol { margin: 8px 0 2px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; max-height: 280px; overflow: auto; }
+details.log li { display: grid; grid-template-columns: 2.6em 1.4em 1fr auto; gap: 6px; align-items: baseline; }
+details.log .n { font-family: var(--f-num); color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+details.log .r { font-family: var(--f-num); color: var(--muted); font-variant-numeric: tabular-nums; }
+.y { color: var(--yes); font-weight: 700; } .nn { color: var(--no); font-weight: 700; }
+
+.note { color: var(--muted); font-size: 11.5px; line-height: 1.7; max-width: 72ch; border-top: 1px solid var(--line); padding-top: 10px; }
+.note p { margin: 0 0 4px; }
+
+.modal { position: fixed; inset: 0; background: rgba(5, 8, 18, .78); display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); z-index: 10; }
+.sheet { background: var(--night-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(520px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.sheet h2 { margin: 0; font-family: var(--f-display); font-weight: 900; font-size: 26px; color: var(--lamp-soft); text-wrap: balance; }
+.sheet h2.lost { color: var(--ink); }
+.sheet p { margin: 0; }
+.sheet ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.prof { background: var(--paper); color: var(--paper-ink); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.prof .pn { font-family: var(--f-display); font-weight: 900; font-size: 19px; }
+.prof dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; }
+.prof dt { color: var(--paper-muted); }
+.prof dd { margin: 0; }
+.prof .fine { font-size: 11.5px; color: var(--paper-muted); }
+.score { font-family: var(--f-num); font-size: 15px; }
+.share { background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--f-num); font-size: 13px; white-space: pre-wrap; word-break: break-all; user-select: all; margin: 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { background: var(--lamp); color: var(--paper-ink); border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 700; font-family: var(--f-display); font-size: 15px; }
+.btn.sub { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.mission { display: flex; flex-direction: column; gap: 6px; background: var(--paper); color: var(--paper-ink); border-radius: 12px; padding: 10px 14px; }
+.mission .mt { font-family: var(--f-display); font-weight: 900; font-size: 15px; }
+.mission .mt span { color: var(--hito); }
+.mission .pr { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 11.5px; color: var(--paper-muted); font-variant-numeric: tabular-nums; }
+.mission .track { height: 8px; background: var(--paper-2); border-radius: 4px; overflow: hidden; }
+.mission .track i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--tanjo), var(--hito)); border-radius: 4px; transition: width .6s ease; }
+.letter { background: var(--paper); color: var(--paper-ink); border-radius: 10px; padding: 16px 18px; font-size: 14.5px; line-height: 1.9; box-shadow: 0 6px 24px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 8px; }
+.letter p { margin: 0; }
+.letter .clue { border-top: 1px dashed rgba(29,34,54,.25); padding-top: 8px; font-size: 13.5px; }
+.letter .sign { text-align: right; color: var(--paper-muted); font-size: 13px; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; color: var(--muted); }
+.goal { font-size: 14px; }
+.goal b { color: var(--lamp-soft); }
+.coach { background: linear-gradient(180deg, rgba(255,199,100,.14), rgba(255,199,100,.06)); border: 1px solid var(--lamp); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.7; display: flex; flex-direction: column; gap: 8px; }
+.coach b { color: var(--lamp-soft); }
+.coach .cb { align-self: flex-start; background: var(--lamp); color: var(--paper-ink); border: 0; border-radius: 8px; padding: 5px 14px; font-weight: 700; font-size: 13px; }
+body.tut [data-adv] { display: none !important; }
+.qcard.spot { box-shadow: 0 0 0 3px var(--lamp), 0 0 22px rgba(255,199,100,.6); animation: spot 1.4s ease-in-out infinite; }
+@keyframes spot { 50% { box-shadow: 0 0 0 3px var(--lamp), 0 0 6px rgba(255,199,100,.2); } }
+.eff { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--paper-muted); margin-top: auto; padding-top: 4px; }
+.eff .m { display: inline-flex; gap: 2px; }
+.eff .m i { width: 9px; height: 6px; border-radius: 2px; background: rgba(29,34,54,.15); }
+.eff.l3 .m i, .eff.l2 .m i:nth-child(-n+2), .eff.l1 .m i:nth-child(1) { background: var(--kurashi); }
+.eff.l1 .m i:nth-child(1) { background: var(--hito); }
+.eff.l3 { color: var(--kurashi); font-weight: 700; }
+.hintTog { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); margin-left: auto; margin-right: 8px; }
+.handHead .ghost { flex: 0 0 auto; }
+@media (prefers-reduced-motion: reduce) { .qcard, .person { transition: none; } .qcard.spot { animation: none; } }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>ミツケタ</h1><span class="sub">82億人のかくれんぼ</span></div>
+    <div class="modes">
+      <button id="modeDaily" class="on" type="button">今日のひとり</button>
+      <button id="modePractice" type="button">練習</button>
+      <button id="helpBtn" type="button" aria-label="遊び方">?</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="stage" aria-label="夜の地球">
+      <div class="sky" id="sky">
+        <canvas id="glow" aria-hidden="true"></canvas>
+        <canvas id="cv" role="img" aria-label="残っている人を表す灯り"></canvas>
+        <div class="hud">
+          <div class="phase" id="phase">地球</div>
+          <div class="count" id="count">82億人</div>
+          <div class="per" id="per">1つの灯り ≈ 41万人</div>
+        </div>
+        <div class="toast" id="toast" hidden></div>
+      </div>
+      <div class="meter" id="meter">
+        <div><span class="k">質問</span><b id="qNow">0</b></div>
+        <div data-adv><span class="k">パー</span><b id="par">–</b></div>
+        <div id="dawnBox" data-adv><span class="k">夜明けまで</span><b id="dawn">–</b></div>
+      </div>
+    </section>
+
+    <section class="play" aria-label="手札">
+      <div class="mission"><div class="mt">目的：<span>手紙の差出人</span>を見つける</div><div class="pr"><span>82億人</span><span class="track"><i id="progBar"></i></span><span id="progTxt">→ 1人</span></div></div>
+      <div class="answer" id="answer" aria-live="polite"></div>
+      <div class="lineup" id="lineup" hidden></div>
+      <div id="notice" class="notice" hidden></div>
+      <div class="coach" id="coach" hidden aria-live="polite"></div>
+      <div class="handHead"><h2>手札</h2><label class="hintTog" id="hintTogWrap" hidden><input type="checkbox" id="hintTog" checked> 目安を表示</label><button class="ghost" id="reroll" type="button" data-adv>引き直す（＋1問）</button></div>
+      <div class="hand" id="hand"></div>
+      <div class="holdRow" data-adv><span class="lbl">とっておき</span><div class="hold" id="hold"></div></div>
+      <div class="crowd" id="crowd" data-adv></div>
+      <details class="log" id="logBox" data-adv><summary>これまでの質問</summary><ol id="log"></ol></details>
+    </section>
+  </main>
+
+  <footer class="note">
+    <p>試作版です。国ごとの数値（人口・年齢・都市に住む割合・インターネット・電気・飲み水・農林水産業）は公開統計をもとにした概算で、正式版では国連・世界銀行などの公式ファイルから取り込みます。小さな国はまとめて扱っています。</p>
+    <p>誕生日・曜日・時刻・生まれ年は一様だと仮定しています。同じ国・年代・性別・都市/農村の中では、質問どうしを独立とみなした推計です。出てくる人物は統計から生成した、実在しない「いそうな誰か」です。</p>
+    <p>着想：80億分の1（1in8b.life）</p>
+  </footer>
+</div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">手紙の差出人を、82億人から見つける</h2>
+    <ol>
+      <li>世界のどこかのひとりから、名前のない手紙が届きます。差出人を見つけるのが目的です。</li>
+      <li>手札の質問カードを1枚えらぶと、差出人の答えに合わない人の灯りが消えます。</li>
+      <li>ちょうど半分に分かれる質問ほど、一気に減らせます。</li>
+      <li>残りが12人以下になったら、顔ぶれから差出人をタップして指名します。</li>
+    </ol>
+    <details style="font-size:13px;color:var(--muted)"><summary>細かいルール</summary>
+      <p style="margin-top:6px">パーは上手な人の目安の問数です。パー＋12問で夜が明けると見失います。指名を外すと＋3問。使わなかったカードは「とっておく」で1枚だけ次の手番に残せます。引き直しは＋1問。手紙の追伸（0・11・22問目に届く）は無料の手がかりです。</p>
+    </details>
+    <div class="row"><button class="btn" id="helpClose" type="button">閉じる</button><button class="btn sub" id="helpTut" type="button">チュートリアルをもう一度</button></div>
+  </div>
+</div>
+
+<div class="modal" id="introModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+    <p class="eyebrow" id="introEye"></p>
+    <h2 id="introTitle">世界のどこかから、手紙が届きました</h2>
+    <div class="letter">
+      <p>はじめまして。<br>わたしは、いま地球にいる82億人のうちのひとりです。<br>名前は書けないけれど、見つけてくれたらうれしいです。</p>
+      <p class="clue" id="introClue" hidden></p>
+      <p class="sign">― 82億人のどこかより</p>
+    </div>
+    <p class="goal"><b>目的</b>　質問カードで候補を減らして、この手紙の差出人を見つけ出す。</p>
+    <div class="row"><button class="btn" id="introGo" type="button">探しに行く</button></div>
+  </div>
+</div>
+
+<div class="modal" id="guessModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="guessTitle">
+    <h2 id="guessTitle">この人が差出人？</h2>
+    <p id="guessWho"></p>
+    <p id="guessOdds" style="color:var(--muted)"></p>
+    <div class="row"><button class="btn" id="guessYes" type="button">指名する</button><button class="btn sub" id="guessNo" type="button">やめる</button></div>
+  </div>
+</div>
+
+<div class="modal" id="endModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <h2 id="endTitle">ミツケタ</h2>
+    <div class="score" id="endScore"></div>
+    <div class="prof" id="endProf"></div>
+    <pre class="share" id="shareText"></pre>
+    <div class="row">
+      <button class="btn" id="goDaily" type="button" hidden>今日のひとりに挑戦</button>
+      <button class="btn" id="copyBtn" type="button">結果をコピー</button>
+      <button class="btn sub" id="againBtn" type="button">練習でもう1回</button>
+      <button class="btn sub" id="closeEnd" type="button">閉じる</button>
+    </div>
+    <p id="copyMsg" style="font-size:12px;color:var(--muted)" aria-live="polite"></p>
+  </div>
+</div>
+
+<script>
+// ===== ミツケタ engine (pure, no DOM) =====
+const AGE_LABELS = ['0〜9歳', '10代', '20代', '30代', '40代', '50代', '60代', '70歳以上'];
+const TPL = {
+  y: [.31, .25, .17, .12, .07, .045, .025, .01],
+  m: [.17, .16, .16, .16, .13, .10, .07, .05],
+  o: [.07, .085, .095, .11, .14, .13, .15, .22]
+};
+function ageShare(med) {
+  let a;
+  const mix = (p, q, t) => p.map((v, i) => v * (1 - t) + q[i] * t);
+  if (med <= 17) a = TPL.y.slice();
+  else if (med <= 30) a = mix(TPL.y, TPL.m, (med - 17) / 13);
+  else if (med <= 48) a = mix(TPL.m, TPL.o, (med - 30) / 18);
+  else a = TPL.o.slice();
+  const s = a.reduce((x, y) => x + y, 0);
+  return a.map(v => v / s);
+}
+
+// 地域の人口合計（百万人、概算）
+const REG_TOT = { as: 4830, af: 1550, eu: 745, am: 1057, oc: 46 };
+
+// [名前, 地域, 小地域, 人口(百万), 中央年齢, 都市%, ネット%, 電気%, 飲み水%, 農林水産%, UTC, 追加, 灯りの位置[緯度,経度,重み], 広がり(度)]
+const NAMED = [
+  ['インド', 'as', 'sa', 1460, 29, 37, 56, 99, 93, 43, 5.5, { nt: .55, eng: 1 }, [[28.6, 77.2, 3], [19.1, 72.9, 2], [22.6, 88.4, 2], [13.1, 80.3, 1.5], [12.97, 77.6, 1.5], [26.8, 80.9, 2.5], [25.6, 85.1, 2], [17.4, 78.5, 1.5], [23, 72.6, 1.5], [21.1, 79.1, 2]], 3],
+  ['中国', 'as', 'ea', 1410, 40, 66, 78, 100, 94, 22, 8, { nt: .92 }, [[31.2, 121.5, 3], [39.9, 116.4, 2.5], [23.1, 113.3, 3], [30.6, 104, 2.5], [29.6, 106.5, 2], [34.3, 108.9, 1.5], [30.6, 114.3, 2], [36.7, 117, 2], [41.8, 123.4, 1.5], [25, 102.7, 1], [28.2, 113, 1.5]], 2.5],
+  ['アメリカ', 'am', '', 347, 38.5, 83, 93, 100, 99.9, 1.6, -5.5, { nt: 1, eh: 0, eng: 1 }, [[40.7, -74, 3], [34, -118.2, 2.5], [41.9, -87.6, 1.5], [29.8, -95.4, 1.5], [33.7, -84.4, 1.2], [25.8, -80.2, 1.2], [47.6, -122.3, .8], [37.8, -122.4, 1], [32.8, -96.8, 1.3], [39, -77, 1.2], [42.4, -71, 1], [39.7, -105, .6], [33.4, -112, .8], [38.6, -90.2, 1], [35, -80, 1.2]], 1.8],
+  ['インドネシア', 'as', 'sea', 285, 30, 59, 69, 99, 93, 28, 7, { nt: 0, sh: .88, isl: 1 }, [[-6.2, 106.8, 3], [-7.3, 112.7, 2], [-7, 110.4, 2], [3.6, 98.7, 1], [-5.1, 119.4, .7], [-0.9, 100.4, .6], [-8.6, 115.2, .4], [-3, 104.7, .6]], 1.5],
+  ['パキスタン', 'as', 'sa', 255, 20.5, 38, 33, 95, 90, 37, 5, { nt: 1, eng: 1 }, [[24.9, 67, 2], [31.5, 74.3, 2], [33.7, 73, 1], [30.2, 71.5, 1.2], [34, 71.5, 1], [30.2, 67, .5]], 1.5],
+  ['ナイジェリア', 'af', '', 237, 18, 54, 45, 61, 78, 35, 1, { nt: 0, eng: 1 }, [[6.5, 3.4, 3], [12, 8.5, 2], [9.1, 7.4, 1], [7.4, 3.9, 1.5], [6.3, 7, 2], [11, 7.7, 1], [10.3, 13, 1]], 1.3],
+  ['ブラジル', 'am', '', 212, 34, 88, 84, 100, 99, 9, -3, { nt: 0, st: .3, sh: .95, eh: 0 }, [[-23.5, -46.6, 3], [-22.9, -43.2, 2], [-19.9, -43.9, 1.2], [-15.8, -47.9, .8], [-12.97, -38.5, 1.2], [-8, -34.9, 1.2], [-3.7, -38.5, 1], [-30, -51.2, 1], [-25.4, -49.3, .8], [-3.1, -60, .5], [-1.4, -48.5, .6]], 1.5],
+  ['バングラデシュ', 'as', 'sa', 175, 26, 41, 45, 99, 98, 37, 6, { nt: .5 }, [[23.8, 90.4, 3], [22.3, 91.8, 1], [24.4, 88.6, 1], [24.9, 91.9, .7]], .9],
+  ['ロシア', 'eu', '', 144, 40, 75, 90, 100, 97, 6, 3, { nt: 1, day: .17, jisa: .14 }, [[55.75, 37.6, 3], [59.9, 30.3, 1.5], [55, 82.9, .6], [56.8, 60.6, .6], [55.8, 49.1, .6], [45, 39, 1], [53.2, 50.1, .6], [43.1, 131.9, .3], [51.7, 39.2, .6]], 2.5],
+  ['エチオピア', 'af', '', 135, 19, 23, 19, 55, 60, 63, 3, { nt: 0, land: 1 }, [[9, 38.7, 2], [7, 38.5, 2], [11.6, 37.4, 1.5], [13.5, 39.5, .8], [9.3, 42.1, .5]], 1.5],
+  ['メキシコ', 'am', '', 131, 30, 81, 81, 99, 99, 12, -6, { nt: .6, eh: 0 }, [[19.4, -99.1, 3], [20.7, -103.3, 1], [25.7, -100.3, 1], [19, -98.2, 1], [21, -89.6, .4], [32.5, -117, .5], [17, -96.7, .7], [16.8, -93.1, .6]], 1.5],
+  ['日本', 'as', 'ea', 123, 49, 92, 87, 100, 99, 3, 9, { nt: 1, isl: 1 }, [[35.7, 139.7, 3], [34.7, 135.5, 2], [35.2, 136.9, 1], [33.6, 130.4, .8], [43.1, 141.3, .5], [38.3, 140.9, .5], [34.4, 132.5, .4]], .8],
+  ['エジプト', 'af', '', 118, 24, 43, 72, 100, 99, 19, 2, { nt: 1 }, [[30, 31.2, 3], [31.2, 29.9, 1], [27, 31, 1.2], [25.7, 32.6, .5], [30.6, 31.5, 1.5]], .7],
+  ['フィリピン', 'as', 'sea', 116, 25, 48, 73, 95, 97, 24, 8, { nt: 0, isl: 1, eng: 1 }, [[14.6, 121, 3], [10.3, 123.9, 1], [7.1, 125.6, .8], [15.5, 120.7, 1], [10.7, 122.6, .6], [8, 124.3, .6]], 1],
+  ['コンゴ民主共和国', 'af', '', 112, 16, 47, 27, 21, 46, 55, 1.5, { nt: 0, sh: .7 }, [[-4.3, 15.3, 2], [-11.7, 27.5, .7], [-1.7, 29.2, .7], [0.5, 25.2, .5], [-6.1, 23.6, .6], [-2.5, 28.8, .6], [-5, 18, 1]], 2],
+  ['ベトナム', 'as', 'sea', 101, 33, 40, 79, 100, 97, 27, 7, { nt: .2 }, [[21, 105.8, 2], [10.8, 106.7, 2.5], [16, 108.2, .6], [20, 105.6, 1], [10, 105.6, 1.2]], 1],
+  ['イラン', 'as', 'me', 92, 33, 77, 79, 100, 98, 15, 3.5, { nt: 1 }, [[35.7, 51.4, 3], [36.3, 59.6, 1], [32.7, 51.7, 1], [38.1, 46.3, 1], [29.6, 52.5, .8], [34.3, 47, .6]], 1.5],
+  ['トルコ', 'as', 'me', 87, 33, 77, 86, 100, 97, 15, 3, { nt: 1 }, [[41, 29, 3], [39.9, 32.9, 1.5], [38.4, 27.1, 1], [37, 35.3, 1], [40.2, 29, .6], [37.9, 40.2, .6]], 1.2],
+  ['ドイツ', 'eu', '', 84, 45, 78, 92, 100, 100, 1, 1, { nt: 1 }, [[52.5, 13.4, 1.2], [48.1, 11.6, 1], [50.9, 6.9, 2], [50.1, 8.7, 1], [53.6, 10, 1], [48.8, 9.2, 1]], 1],
+  ['タイ', 'as', 'sea', 72, 40, 53, 88, 100, 100, 30, 7, { nt: 0 }, [[13.75, 100.5, 3], [18.8, 99, .8], [15, 103, 1.5], [7.9, 98.4, .4], [16.4, 102.8, .6]], 1.2],
+  ['タンザニア', 'af', '', 70, 17, 37, 32, 46, 61, 65, 3, { nt: 0, sh: 1, eng: 1 }, [[-6.8, 39.3, 1.5], [-2.5, 32.9, 1], [-3.4, 36.7, .8], [-6.2, 35.7, .6], [-8.9, 33.5, .6], [-5, 30, .4]], 1.5],
+  ['イギリス', 'eu', '', 69, 40, 84, 96, 100, 100, 1, 0, { nt: 1, eh: .3, isl: 1, eng: 1 }, [[51.5, -0.1, 3], [52.5, -1.9, 1], [53.5, -2.2, 1], [53.8, -1.5, .8], [55.9, -4.3, .6], [51.5, -3.2, .4]], .8],
+  ['フランス', 'eu', '', 66, 42, 82, 86, 100, 100, 2, 1, { nt: 1, eh: .75 }, [[48.9, 2.35, 3], [45.8, 4.8, 1], [43.3, 5.4, 1], [43.6, 1.4, .6], [50.6, 3.1, .6], [47.2, -1.6, .5], [44.8, -0.6, .5], [48.6, 7.75, .4]], 1],
+  ['南アフリカ', 'af', '', 64, 28, 68, 75, 87, 94, 20, 2, { nt: 0, st: 1, sh: 1, eng: 1 }, [[-26.2, 28, 3], [-33.9, 18.4, 1.2], [-29.9, 31, 1.2], [-25.7, 28.2, 1], [-33.96, 25.6, .5], [-23.9, 29.5, .6]], 1.2],
+  ['イタリア', 'eu', '', 59, 48, 72, 86, 100, 100, 4, 1, { nt: 1 }, [[45.5, 9.2, 2], [41.9, 12.5, 1.5], [40.85, 14.3, 1.5], [45.1, 7.7, .8], [44.5, 11.3, .8], [38.1, 13.4, .8], [45.4, 11.9, .8]], .8],
+  ['ケニア', 'af', '', 57, 20, 29, 35, 76, 72, 33, 3, { nt: 0, sh: .6, eng: 1 }, [[-1.3, 36.8, 2], [-4, 39.7, .8], [-0.1, 34.8, 1], [0.5, 35.3, .8], [-0.4, 36.9, .8]], .9],
+  ['ミャンマー', 'as', 'sea', 55, 29, 32, 58, 73, 84, 45, 6.5, { nt: .15 }, [[16.8, 96.2, 2], [21.97, 96.1, 1], [19.7, 96.1, .5], [20.8, 94.5, .6], [17.3, 95.5, 1]], 1.2],
+  ['コロンビア', 'am', '', 53, 31, 82, 75, 100, 98, 15, -5, { nt: 0, sh: .03, eh: 0 }, [[4.7, -74.1, 2.5], [6.2, -75.6, 1.2], [3.45, -76.5, 1], [10.96, -74.8, .8], [7.1, -73.1, .5]], 1],
+  ['韓国', 'as', 'ea', 52, 45, 81, 97, 100, 100, 5, 9, { nt: 1 }, [[37.6, 127, 3], [35.2, 129.1, 1], [35.9, 128.6, .6], [35.2, 126.9, .4], [36.35, 127.4, .4]], .5],
+  ['スーダン', 'af', '', 51, 19, 36, 29, 63, 62, 40, 2, { nt: .1, eng: 1 }, [[15.6, 32.5, 2], [13.2, 30.2, .8], [12, 24.9, .8], [14.4, 33.5, 1], [19.6, 37.2, .3]], 1.5],
+  ['ウガンダ', 'af', '', 51, 16, 26, 15, 47, 56, 65, 3, { nt: 0, sh: .15, land: 1, eng: 1 }, [[0.35, 32.6, 2], [2.8, 32.3, .7], [-0.6, 30.6, .8], [1.1, 34.2, .8]], .9],
+  ['スペイン', 'eu', '', 48, 45, 81, 95, 100, 100, 4, 1, { nt: 1, eh: .25 }, [[40.4, -3.7, 2], [41.4, 2.2, 1.5], [37.4, -6, .8], [39.5, -0.4, .8], [43.3, -2.9, .5], [36.7, -4.4, .5]], .9],
+  ['アルジェリア', 'af', '', 47, 28, 75, 71, 100, 94, 10, 1, { nt: 1, eh: .85 }, [[36.75, 3.06, 2], [35.7, -0.6, 1], [36.4, 6.6, 1], [35.6, 6.2, .6], [34.8, 5.7, .4]], .9],
+  ['イラク', 'as', 'me', 47, 21, 71, 79, 100, 98, 18, 3, { nt: 1 }, [[33.3, 44.4, 3], [30.5, 47.8, 1], [36.3, 43.1, 1], [36.2, 44, .6], [32, 44.3, .8]], 1],
+  ['アルゼンチン', 'am', '', 46, 32, 92, 89, 100, 99, 7, -3, { nt: 0, st: .97, sh: 1, eh: 0 }, [[-34.6, -58.4, 3], [-31.4, -64.2, .8], [-32.9, -60.7, .6], [-32.9, -68.8, .5], [-26.8, -65.2, .5]], 1],
+  ['アフガニスタン', 'as', 'sa', 43, 17, 27, 18, 85, 82, 45, 4.5, { nt: 1, land: 1 }, [[34.5, 69.2, 2], [31.6, 65.7, .8], [36.7, 67.1, .7], [34.3, 62.2, .7], [34.4, 70.4, .5]], 1.2],
+  ['カナダ', 'am', '', 40, 41, 82, 94, 100, 99, 1.5, -5, { nt: 1, eh: 0, eng: 1 }, [[43.7, -79.4, 2.5], [45.5, -73.6, 1.5], [49.3, -123.1, 1], [51, -114, .6], [53.5, -113.5, .5], [45.4, -75.7, .5], [46.8, -71.2, .4], [49.9, -97.1, .3]], 1],
+  ['ポーランド', 'eu', '', 38, 42, 60, 87, 100, 100, 8, 1, { nt: 1 }, [[52.2, 21, 1.5], [50.06, 19.9, 1], [51.1, 17, .8], [50.3, 19, 1.2], [54.35, 18.6, .6], [52.4, 16.9, .6]], 1],
+  ['サウジアラビア', 'as', 'me', 34, 30, 85, 100, 100, 100, 3, 3, { nt: .8 }, [[24.7, 46.7, 2], [21.5, 39.2, 1.5], [26.4, 50.1, .8], [21.4, 39.8, .6], [18.2, 42.5, .4]], 1.2]
+];
+
+// まとめた国・地域（性質は人口で重み付けした割合の概算）
+const GROUPS = [
+  { name: 'その他のアジア', label: 'アジアの その他の国・地域', reg: 'as', med: 30, urb: 55, net: 70, ele: 95, wat: 92, agr: 22,
+    P: { sa: .13, ea: .14, sea: .17, me: .33, nt: .65, st: 0, sh: .01, eh: 1, isl: .13, land: .32, eng: .1, day: .75, jisa: .31, short: .5, hasA: .4, kanji: .13, big1: 0, big05: 0, young: .5 },
+    anchors: [[3.1, 101.7, .9], [25, 121.5, .8], [22.6, 120.3, .3], [27.7, 85.3, .4], [26.8, 85.5, .5], [41.3, 69.3, .6], [40.4, 71.8, .4], [6.9, 79.9, .7], [15.4, 44.2, .6], [12.8, 45, .3], [33.5, 36.3, .4], [36.2, 37.2, .4], [11.6, 104.9, .6], [39, 125.8, .9], [43.2, 76.9, .35], [32.1, 34.8, .4], [31.95, 35.9, .4], [25.2, 55.3, .4], [22.3, 114.2, .3], [18, 102.6, .25], [1.35, 103.8, .2], [40.4, 49.9, .3], [38.6, 68.8, .35], [42.9, 74.6, .2], [37.95, 58.4, .2], [33.9, 35.5, .2], [23.6, 58.4, .15], [29.4, 47.98, .15], [41.7, 44.8, .12], [47.9, 106.9, .1]], spread: 1.1 },
+  { name: 'その他のアフリカ', label: 'アフリカの その他の国・地域', reg: 'af', med: 18, urb: 45, net: 35, ele: 55, wat: 65, agr: 45,
+    P: { sa: 0, ea: 0, sea: 0, me: 0, nt: .1, st: .04, sh: .34, eh: .66, isl: .06, land: .34, eng: .28, day: .01, jisa: 0, short: .5, hasA: .45, kanji: 0, big1: 0, big05: 0, young: 1 },
+    anchors: [[33.6, -7.6, 1], [5.6, -0.2, .6], [6.7, -1.6, .4], [-8.8, 13.2, .8], [-25.9, 32.6, .3], [-15.1, 39.3, .5], [-18.9, 47.5, .7], [5.35, -4, .7], [4, 9.7, .4], [3.9, 11.5, .4], [13.5, 2.1, .5], [12.4, -1.5, .5], [12.6, -8, .5], [-14, 33.8, .5], [-15.4, 28.3, .5], [14.7, -17.4, .4], [12.1, 15, .4], [2, 45.3, .4], [-17.8, 31, .4], [-1.95, 30.1, .4], [-3.4, 29.4, .4], [36.8, 10.2, .35], [9.5, -13.7, .3], [6.4, 2.4, .3], [32.9, 13.2, .2], [4.85, 31.6, .3], [8.5, -13.2, .2], [6.1, 1.2, .2]], spread: 1.8 },
+  { name: 'その他のヨーロッパ', label: 'ヨーロッパの その他の国・地域', reg: 'eu', med: 43, urb: 73, net: 88, ele: 100, wat: 99, agr: 6,
+    P: { sa: 0, ea: 0, sea: 0, me: 0, nt: 1, st: 0, sh: 0, eh: .93, isl: .03, land: .28, eng: .03, day: .04, jisa: 0, short: .5, hasA: .4, kanji: 0, big1: 0, big05: 0, young: 0 },
+    anchors: [[50.45, 30.5, 1.3], [50, 36.2, .6], [44.4, 26.1, .8], [52.4, 4.9, .8], [50.85, 4.35, .5], [59.3, 18, .4], [50.1, 14.4, .5], [38, 23.7, .5], [38.7, -9.1, .4], [41.1, -8.6, .3], [47.5, 19, .5], [53.9, 27.6, .4], [48.2, 16.4, .4], [47.4, 8.5, .4], [44.8, 20.5, .3], [42.7, 23.3, .3], [55.7, 12.6, .3], [60.2, 24.9, .25], [59.9, 10.75, .25], [53.35, -6.3, .3], [45.8, 16, .2], [48.1, 17.1, .2], [54.7, 25.3, .15], [56.9, 24.1, .1]], spread: .9 },
+  { name: 'その他の中南米', label: '中南米の その他の国・地域', reg: 'am', med: 29, urb: 76, net: 75, ele: 97, wat: 95, agr: 15,
+    P: { sa: 0, ea: 0, sea: 0, me: 0, nt: .01, st: .10, sh: .39, eh: 0, isl: .19, land: .09, eng: .04, day: 0, jisa: 0, short: .5, hasA: .4, kanji: 0, big1: 0, big05: 0, young: .45 },
+    anchors: [[-12, -77, 1.2], [10.5, -66.9, .8], [10.6, -71.6, .4], [-33.45, -70.65, .8], [-0.2, -78.5, .4], [-2.2, -79.9, .4], [14.6, -90.5, .6], [-16.5, -68.1, .3], [-17.8, -63.2, .3], [18.5, -72.3, .5], [23.1, -82.4, .4], [18.5, -69.9, .4], [14.1, -87.2, .4], [12.1, -86.3, .25], [-25.3, -57.6, .25], [13.7, -89.2, .25], [9.9, -84.1, .2], [9, -79.5, .15], [-34.9, -56.2, .15], [18.4, -66.1, .12], [18, -76.8, .1]], spread: .9 },
+  { name: 'オセアニア', label: 'オセアニアの国・地域', reg: 'oc', med: 34, urb: 65, net: 78, ele: 88, wat: 88, agr: 14,
+    P: { sa: 0, ea: 0, sea: 0, me: 0, nt: 0, st: .67, sh: .98, eh: 1, isl: .41, land: 0, eng: .95, day: 1, jisa: 1, short: .05, hasA: .85, kanji: 0, big1: 0, big05: 0, young: .25 },
+    anchors: [[-33.9, 151.2, 1.5], [-37.8, 145, 1.4], [-27.5, 153, .8], [-31.95, 115.9, .6], [-34.9, 138.6, .4], [-36.8, 174.8, .6], [-9.4, 147.2, .3], [-6, 144, .8], [-18, 178, .1]], spread: 1.1 }
+];
+
+const COUNTRIES = [];
+for (const r of NAMED) {
+  const [name, reg, sub, pop, med, urb, net, ele, wat, agr, utc, x, anchors, spread] = r;
+  const nt = x.nt ?? 0, st = x.st ?? 0;
+  const P = {
+    sa: +(sub === 'sa'), ea: +(sub === 'ea'), sea: +(sub === 'sea'), me: +(sub === 'me'),
+    nt, st, sh: x.sh ?? 0, eh: x.eh ?? (reg === 'am' ? 0 : 1), isl: x.isl ?? 0, land: x.land ?? 0, eng: x.eng ?? 0,
+    day: x.day ?? ((utc >= 4 && utc <= 16) ? 1 : 0), jisa: x.jisa ?? (Math.abs(utc - 9) <= 3 ? 1 : 0),
+    short: [...name].length <= 4 ? 1 : 0, hasA: name.includes('ア') ? 1 : 0, kanji: /[一-鿿]/.test(name) ? 1 : 0,
+    big1: pop >= 100 ? 1 : 0, big05: pop >= 50 ? 1 : 0, young: med < 30 ? 1 : 0
+  };
+  COUNTRIES.push({ name, label: name, reg, pop, med, urb: urb / 100, net: net / 100, ele: ele / 100, wat: wat / 100, agr: agr / 100, P, anchors, spread, group: false });
+}
+for (const g of GROUPS) {
+  const used = COUNTRIES.filter(c => c.reg === g.reg).reduce((s, c) => s + c.pop, 0);
+  COUNTRIES.push({ name: g.name, label: g.label, reg: g.reg, pop: REG_TOT[g.reg] - used, med: g.med, urb: g.urb / 100, net: g.net / 100, ele: g.ele / 100, wat: g.wat / 100, agr: g.agr / 100, P: g.P, anchors: g.anchors, spread: g.spread, group: true });
+}
+for (const c of COUNTRIES) {
+  c.P.trop = Math.max(0, 1 - c.P.nt - c.P.st);
+  c.age = ageShare(c.med);
+  c.ropt = c.reg === 'as' ? 0 : c.reg === 'af' ? 1 : c.reg === 'eu' ? 2 : c.reg === 'oc' ? 5 : (c.name === 'アメリカ' || c.name === 'カナダ') ? 3 : 4;
+}
+
+const NCTY = COUNTRIES.length, NC = NCTY * 32;
+const cellC = new Uint8Array(NC), cellA = new Uint8Array(NC), cellS = new Uint8Array(NC), cellU = new Uint8Array(NC);
+const MASS0 = new Float64Array(NC);
+for (let c = 0; c < NCTY; c++) for (let a = 0; a < 8; a++) for (let s = 0; s < 2; s++) for (let u = 0; u < 2; u++) {
+  const i = ((c * 8 + a) * 2 + s) * 2 + u;
+  const C = COUNTRIES[c];
+  cellC[i] = c; cellA[i] = a; cellS[i] = s; cellU[i] = u;
+  MASS0[i] = C.pop * 1e6 * C.age[a] * 0.5 * (u ? C.urb : 1 - C.urb);
+}
+const MASS0_SUM = MASS0.reduce((x, y) => x + y, 0);
+
+// ---- individual attributes (assumed uniform) ----
+const MDAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const BD = [];
+for (let m = 0; m < 12; m++) for (let d = 1; d <= MDAYS[m]; d++) BD.push({ m, d, w: (m === 1 && d === 29) ? .25 : 1 });
+const ATTR_BASE = {
+  bd: Float64Array.from(BD.map(b => b.w)),
+  wd: new Float64Array(7).fill(1),
+  hr: new Float64Array(24).fill(1),
+  mi: new Float64Array(60).fill(1),
+  yd: new Float64Array(10).fill(1)
+};
+const ATTR_SUM = {};
+for (const k in ATTR_BASE) ATTR_SUM[k] = ATTR_BASE[k].reduce((x, y) => x + y, 0);
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+
+// ---- cards ----
+const CARDS = [], CARD_BY = {};
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function push(c) { CARDS.push(c); CARD_BY[c.id] = c; }
+function addCell(id, cat, q, hint, fn, o = {}) {
+  const p = new Float32Array(NC);
+  for (let i = 0; i < NC; i++) p[i] = clamp(fn(COUNTRIES[cellC[i]], cellA[i], cellS[i], cellU[i]), 0, 1);
+  push({ id, kind: 'cell', cat, q, hint, p, geo: !!o.geo, fam: o.fam || null, cost: 1 });
+}
+function splitRate(rate, urb, factor) {
+  const pu = Math.min(.995, rate * factor);
+  let pr = urb < 1 ? (rate - urb * pu) / (1 - urb) : pu;
+  return [clamp(pr, .005, .995), pu];
+}
+const P = k => (c) => c.P[k];
+addCell('asia', '地理', 'アジアに住んでいる？', 'トルコ・中東もふくむ', c => +(c.reg === 'as'), { geo: true });
+addCell('africa', '地理', 'アフリカに住んでいる？', 'エジプトもふくむ', c => +(c.reg === 'af'), { geo: true });
+addCell('europe', '地理', 'ヨーロッパに住んでいる？', 'ロシアもふくむ', c => +(c.reg === 'eu'), { geo: true });
+addCell('americas', '地理', '南北アメリカに住んでいる？', '', c => +(c.reg === 'am'), { geo: true });
+addCell('sa', '地理', '南アジアに住んでいる？', 'インド・パキスタン・バングラデシュなど', P('sa'), { geo: true });
+addCell('ea', '地理', '東アジアに住んでいる？', '中国・日本・韓国など', P('ea'), { geo: true });
+addCell('sea', '地理', '東南アジアに住んでいる？', 'インドネシア・フィリピン・ベトナムなど', P('sea'), { geo: true });
+addCell('me', '地理', '中東・西アジアに住んでいる？', 'イラン・トルコ・サウジアラビアなど', P('me'), { geo: true });
+addCell('nt', '地理', '北回帰線より北に住んでいる？', '北緯23.4度より北', P('nt'), { geo: true });
+addCell('trop', '地理', '熱帯に住んでいる？', '北回帰線と南回帰線のあいだ', P('trop'), { geo: true });
+addCell('sh', '地理', '南半球に住んでいる？', '赤道より南', P('sh'), { geo: true });
+addCell('eh', '地理', 'ロンドンより東に住んでいる？', '経度0度より東', P('eh'), { geo: true });
+addCell('isl', '地理', '島国に住んでいる？', '日本・インドネシア・フィリピン・イギリスなど', P('isl'), { geo: true });
+addCell('land', '地理', '海に面していない国に住んでいる？', 'エチオピア・ウガンダ・アフガニスタンなど', P('land'), { geo: true });
+addCell('day', '地理', '日本時間の正午、その人のいる所は昼？', '現地時間で7〜19時', P('day'), { geo: true });
+addCell('jisa', '地理', '日本との時差が3時間以内？', '', P('jisa'), { geo: true });
+addCell('big1', '国', '人口1億人以上の国に住んでいる？', '', P('big1'), { geo: true });
+addCell('big05', '国', '人口5000万人以上の国に住んでいる？', '', P('big05'), { geo: true });
+addCell('young', '国', '人口の半分以上が30歳未満の国？', '中央年齢が30歳未満', P('young'), { geo: true });
+addCell('eng', '国', '英語が公用語の国に住んでいる？', '', P('eng'), { geo: true });
+addCell('short', '国', '国の名前が4文字以下？', '日本語の表記で数える', P('short'), { geo: true });
+addCell('hasA', '国', '国の名前に「ア」が入る？', '日本語の表記', P('hasA'), { geo: true });
+addCell('kanji', '国', '国の名前に漢字が入る？', '日本語の表記', P('kanji'), { geo: true });
+for (const t of [10, 20, 30, 40, 50, 60, 70]) addCell('age' + t, '人', `${t}歳以上？`, '', (c, a) => +(a >= t / 10));
+addCell('teen', '人', '10代？', '', (c, a) => +(a === 1));
+addCell('twen', '人', '20代？', '', (c, a) => +(a === 2));
+addCell('thir', '人', '30代？', '', (c, a) => +(a === 3));
+addCell('female', '人', '女性？', '', (c, a, s) => s);
+addCell('urban', '人', '都市部に住んでいる？', '', (c, a, s, u) => u);
+const NETAGE = [.35, 1.1, 1.2, 1.1, 1.0, .85, .7, .45];
+addCell('net', 'くらし', 'インターネットを使っている？', '', (c, a, s, u) => Math.min(.99, splitRate(c.net, c.urb, 1.25)[u] * NETAGE[a]), { fam: 'life' });
+addCell('ele', 'くらし', '家に電気が来ている？', '', (c, a, s, u) => splitRate(c.ele, c.urb, 1.1)[u], { fam: 'life' });
+addCell('wat', 'くらし', '家で安全な飲み水を使える？', '', (c, a, s, u) => splitRate(c.wat, c.urb, 1.1)[u], { fam: 'life' });
+const EMP = [0, .2, .6, .72, .7, .55, .3, .08];
+addCell('agr', 'くらし', '農林水産業で働いている？', '', (c, a, s, u) => {
+  const k = 1 / (c.urb * .15 + (1 - c.urb));
+  return Math.min(.95, c.agr * EMP[a] * (u ? .15 * k : k));
+}, { fam: 'life' });
+{
+  const opt = new Int8Array(NC);
+  for (let i = 0; i < NC; i++) opt[i] = COUNTRIES[cellC[i]].ropt;
+  push({ id: 'region6', kind: 'multi', cat: '地理', q: 'どの地域に住んでいる？', hint: '6択・2問ぶん', opts: ['アジア', 'アフリカ', 'ヨーロッパ', '北アメリカ', '中南米', 'オセアニア'], opt, geo: true, cost: 2 });
+}
+function addAttr(id, attr, q, fn, hint = '') {
+  const n = ATTR_BASE[attr].length, pred = new Uint8Array(n);
+  for (let v = 0; v < n; v++) pred[v] = fn(attr === 'bd' ? BD[v] : v) ? 1 : 0;
+  push({ id, kind: 'attr', cat: '誕生', q, hint, attr, pred, cost: 1 });
+}
+addAttr('b_h1', 'bd', '1〜6月に生まれた？', b => b.m < 6);
+addAttr('b_spr', 'bd', '春（3〜5月）に生まれた？', b => b.m >= 2 && b.m <= 4);
+addAttr('b_sum', 'bd', '夏（6〜8月）に生まれた？', b => b.m >= 5 && b.m <= 7);
+addAttr('b_aut', 'bd', '秋（9〜11月）に生まれた？', b => b.m >= 8 && b.m <= 10);
+addAttr('b_win', 'bd', '冬（12〜2月）に生まれた？', b => b.m === 11 || b.m < 2);
+addAttr('b_odd', 'bd', '奇数の月に生まれた？', b => (b.m + 1) % 2 === 1);
+addAttr('b_31', 'bd', '31日まである月に生まれた？', b => MDAYS[b.m] === 31);
+addAttr('b_q13', 'bd', '1〜3月か7〜9月に生まれた？', b => b.m < 3 || (b.m >= 6 && b.m <= 8));
+addAttr('d_15', 'bd', '誕生日が15日まで？', b => b.d <= 15);
+addAttr('d_10', 'bd', '誕生日が10日まで？', b => b.d <= 10);
+addAttr('d_21', 'bd', '誕生日が21日以降？', b => b.d >= 21);
+addAttr('d_even', 'bd', '誕生日が偶数の日？', b => b.d % 2 === 0);
+addAttr('d_1', 'bd', '誕生日の日付に「1」が入る？', b => String(b.d).includes('1'));
+addAttr('d_2', 'bd', '誕生日の日付に「2」が入る？', b => String(b.d).includes('2'));
+addAttr('d_5x', 'bd', '誕生日が5の倍数の日？', b => b.d % 5 === 0);
+addAttr('d_half', 'bd', '誕生日が1〜7日か16〜23日？', b => b.d <= 7 || (b.d >= 16 && b.d <= 23));
+addAttr('w_end', 'wd', '土曜か日曜に生まれた？', v => v === 0 || v === 6);
+addAttr('w_mtw', 'wd', '月・火・水曜に生まれた？', v => v >= 1 && v <= 3);
+addAttr('w_fri', 'wd', '金曜に生まれた？', v => v === 5);
+addAttr('w_tt', 'wd', '火曜か木曜に生まれた？', v => v === 2 || v === 4);
+addAttr('w_sm', 'wd', '土曜か月曜に生まれた？', v => v === 6 || v === 1);
+addAttr('h_am', 'hr', '午前（0〜11時台）に生まれた？', v => v < 12);
+addAttr('h_eve', 'hr', '夜（18〜23時台）に生まれた？', v => v >= 18);
+addAttr('h_mor', 'hr', '朝（6〜9時台）に生まれた？', v => v >= 6 && v <= 9);
+addAttr('h_even', 'hr', '偶数の時台に生まれた？', v => v % 2 === 0, '0時台・2時台…');
+addAttr('h_night', 'hr', '深夜（0〜5時台）に生まれた？', v => v < 6);
+addAttr('h_noon', 'hr', '昼（12〜17時台）に生まれた？', v => v >= 12 && v < 18);
+addAttr('h_1', 'hr', '生まれた時刻の「時」に「1」が入る？', v => String(v).includes('1'));
+addAttr('m_30', 'mi', '生まれた時刻の「分」が29分まで？', v => v < 30);
+addAttr('m_even', 'mi', '「分」が偶数？', v => v % 2 === 0, '生まれた時刻');
+addAttr('m_15', 'mi', '「分」が0〜14分？', v => v < 15, '生まれた時刻');
+addAttr('m_45', 'mi', '「分」が45〜59分？', v => v >= 45, '生まれた時刻');
+addAttr('m_3', 'mi', '「分」の数字に「3」が入る？', v => String(v).includes('3'), '生まれた時刻');
+addAttr('m_one5', 'mi', '「分」の一の位が5以上？', v => v % 10 >= 5, '生まれた時刻');
+addAttr('m_2039', 'mi', '「分」が20〜39分？', v => v >= 20 && v < 40, '生まれた時刻');
+addAttr('y_even', 'yd', '偶数の年に生まれた？', v => v % 2 === 0);
+addAttr('y_5', 'yd', '生まれ年の下1桁が5以上？', v => v >= 5);
+addAttr('y_02', 'yd', '生まれ年の下1桁が0〜2？', v => v <= 2);
+addAttr('y_3x', 'yd', '生まれ年の下1桁が0・3・6・9？', v => v % 3 === 0);
+
+// ---- rng ----
+function mulberry32(a) { a >>>= 0; return function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function hashStr(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function sampleIdx(w, total, rng) { let r = rng() * total; for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0 && w[i] > 0) return i; } for (let i = w.length - 1; i >= 0; i--) if (w[i] > 0) return i; return 0; }
+function shuffle(a, rng) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const H2 = f => (f <= 0 || f >= 1) ? 0 : -(f * Math.log2(f) + (1 - f) * Math.log2(1 - f));
+const HD = d => d.reduce((s, p) => p > 0 ? s - p * Math.log2(p) : s, 0);
+
+// world-wide yes share (for "82億人全体では" display)
+const WORLD_YES = {};
+for (const c of CARDS) {
+  if (c.kind === 'cell') { let y = 0; for (let i = 0; i < NC; i++) y += MASS0[i] * c.p[i]; WORLD_YES[c.id] = y / MASS0_SUM; }
+  else if (c.kind === 'attr') { const b = ATTR_BASE[c.attr]; let y = 0; for (let v = 0; v < b.length; v++) if (c.pred[v]) y += b[v]; WORLD_YES[c.id] = y / ATTR_SUM[c.attr]; }
+}
+
+const WIT_AT = [0, 11, 22];
+const LINEUP_AT = 12;
+
+class Game {
+  constructor(seed, opt = {}) {
+    this.seed = seed;
+    this.limit = opt.limit ?? Infinity;
+    this.lineupAt = opt.lineupAt ?? LINEUP_AT;
+    this.witnessOn = opt.witness ?? true;
+    this.rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+    const trng = mulberry32(seed);
+    const cell = sampleIdx(MASS0, MASS0_SUM, trng);
+    const vals = {};
+    for (const k in ATTR_BASE) vals[k] = sampleIdx(ATTR_BASE[k], ATTR_SUM[k], trng);
+    this.target = { isT: true, cell, vals, ans: this.answersFor(cell, vals, trng, null) };
+    this.w = Float64Array.from(MASS0);
+    this.al = {};
+    for (const k in ATTR_BASE) this.al[k] = Float64Array.from(ATTR_BASE[k]);
+    this.asked = new Set(); this.fam = {}; this.q = 0; this.log = [];
+    this.hand = []; this.hold = null; this.lineup = null; this.witIdx = 0;
+    this.over = false; this.found = false; this.lastChance = false;
+    this.pile = shuffle(CARDS.map(c => c.id), mulberry32(((opt.deckSeed ?? seed) * 7 + 13) >>> 0));
+    this.checkWitness();
+    this.deal();
+  }
+  answersFor(cell, vals, rng, fixed) {
+    const ans = {};
+    for (const c of CARDS) {
+      if (fixed && this.asked.has(c.id)) { ans[c.id] = fixed[c.id]; continue; }
+      if (c.kind === 'cell') ans[c.id] = rng() < c.p[cell] ? 1 : 0;
+      else if (c.kind === 'multi') ans[c.id] = c.opt[cell];
+      else ans[c.id] = c.pred[vals[c.attr]];
+    }
+    return ans;
+  }
+  sumW() { let s = 0; const w = this.w; for (let i = 0; i < NC; i++) s += w[i]; return s; }
+  attrFactor() { let f = 1; for (const k in this.al) { let s = 0; const a = this.al[k]; for (let v = 0; v < a.length; v++) s += a[v]; f *= s / ATTR_SUM[k]; } return f; }
+  remaining() { return this.lineup ? this.alive().length : this.sumW() * this.attrFactor(); }
+  alive() { return this.lineup ? this.lineup.people.filter(p => p.alive) : []; }
+  frac(c) {
+    if (this.lineup) {
+      const al = this.alive();
+      if (c.kind === 'multi') { const d = new Array(c.opts.length).fill(0); for (const p of al) d[p.ans[c.id]]++; return d.map(v => v / al.length); }
+      let y = 0; for (const p of al) y += p.ans[c.id]; return al.length ? y / al.length : 0;
+    }
+    if (c.kind === 'cell') { let y = 0, t = 0; const w = this.w, p = c.p; for (let i = 0; i < NC; i++) { y += w[i] * p[i]; t += w[i]; } return t > 0 ? y / t : 0; }
+    if (c.kind === 'multi') { const d = new Array(c.opts.length).fill(0); let t = 0; for (let i = 0; i < NC; i++) { d[c.opt[i]] += this.w[i]; t += this.w[i]; } return d.map(v => t > 0 ? v / t : 0); }
+    const a = this.al[c.attr]; let y = 0, t = 0; for (let v = 0; v < a.length; v++) { t += a[v]; if (c.pred[v]) y += a[v]; } return t > 0 ? y / t : 0;
+  }
+  bitsOf(c) { const f = this.frac(c); return c.kind === 'multi' ? HD(f) : H2(f); }
+  dead(c) {
+    if (this.lineup) return false;
+    const f = this.frac(c);
+    if (c.kind === 'multi') return Math.max(...f) > 1 - 1e-9;
+    return f < 1e-9 || f > 1 - 1e-9;
+  }
+  splits(c) { const al = this.alive(); if (al.length < 2) return false; const v = al[0].ans[c.id]; return al.some(p => p.ans[c.id] !== v); }
+  famOK(c) { return !c.fam || (this.fam[c.fam] || 0) < 2; }
+  usable(c) { return !this.asked.has(c.id) && this.famOK(c) && !this.dead(c); }
+  deal() {
+    const need = 3 - this.hand.length;
+    if (need <= 0) return;
+    const picks = [];
+    if (this.lineup) for (let i = 0; i < this.pile.length && picks.length < need; i++) { const c = CARD_BY[this.pile[i]]; if (this.usable(c) && this.splits(c)) picks.push(i); }
+    for (let i = 0; i < this.pile.length && picks.length < need; i++) { if (picks.includes(i)) continue; if (this.usable(CARD_BY[this.pile[i]])) picks.push(i); }
+    picks.sort((a, b) => a - b);
+    const ids = picks.map(i => this.pile[i]);
+    for (let k = picks.length - 1; k >= 0; k--) this.pile.splice(picks[k], 1);
+    this.hand.push(...ids);
+  }
+  applyAnswer(c, a) {
+    const w = this.w;
+    if (c.kind === 'cell') { const p = c.p; if (a) for (let i = 0; i < NC; i++) w[i] *= p[i]; else for (let i = 0; i < NC; i++) w[i] *= 1 - p[i]; }
+    else if (c.kind === 'multi') { for (let i = 0; i < NC; i++) if (c.opt[i] !== a) w[i] = 0; }
+    else { const al = this.al[c.attr], pr = c.pred; for (let v = 0; v < al.length; v++) if (pr[v] !== a) al[v] = 0; }
+    this.asked.add(c.id);
+    if (c.fam) this.fam[c.fam] = (this.fam[c.fam] || 0) + 1;
+    if (this.lineup) for (const p of this.lineup.people) if (p.alive && p.ans[c.id] !== a) { p.alive = false; p.outStep = this.log.length; }
+  }
+  settleHand(usedId, markId) {
+    let hold = this.hold;
+    if (usedId && hold === usedId) hold = null;
+    for (const h of this.hand) {
+      if (h === usedId) continue;
+      if (h === markId) { if (hold) this.pile.push(hold); hold = h; }
+      else this.pile.push(h);
+    }
+    this.hand = [];
+    this.hold = hold;
+  }
+  ask(id, markId) {
+    if (this.over || this.lastChance) return null;
+    const c = CARD_BY[id];
+    const before = this.remaining();
+    const f = this.frac(c), bits = this.bitsOf(c), a = this.target.ans[id];
+    this.applyAnswer(c, a);
+    this.q += c.cost;
+    this.settleHand(id, markId);
+    const share = c.kind === 'multi' ? f[a] : (a ? f : 1 - f);
+    const entry = { t: 'ask', id, a, f, share, bits, cost: c.cost, q: this.q, before };
+    this.log.push(entry);
+    this.after();
+    entry.afterR = this.remaining();
+    return entry;
+  }
+  reroll(markId) {
+    if (this.over || this.lastChance) return null;
+    this.q += 1;
+    this.settleHand(null, markId);
+    const entry = { t: 'reroll', cost: 1, q: this.q };
+    this.log.push(entry);
+    this.after();
+    return entry;
+  }
+  after() {
+    if (!this.lineup && this.remaining() <= this.lineupAt) this.enterLineup();
+    this.checkWitness();
+    if (this.hold && !this.usable(CARD_BY[this.hold])) { this.pile.push(this.hold); this.hold = null; }
+    this.hand = this.hand.filter(h => { if (this.usable(CARD_BY[h])) return true; this.pile.push(h); return false; });
+    this.deal();
+    this.checkLimit();
+  }
+  checkLimit() {
+    if (this.over) return;
+    if (this.q >= this.limit) { if (!this.lineup) { this.over = true; this.found = false; } else this.lastChance = true; }
+  }
+  checkWitness() {
+    while (this.witnessOn && this.witIdx < WIT_AT.length && this.q >= WIT_AT[this.witIdx]) { this.witIdx++; this.witness(); }
+  }
+  witness() {
+    const held = new Set([...this.hand, this.hold].filter(Boolean));
+    const cand = CARDS.filter(c => c.kind !== 'multi' && !held.has(c.id) && this.usable(c));
+    let pool;
+    if (this.lineup) pool = cand.filter(c => this.splits(c));
+    else pool = cand.filter(c => { const f = this.frac(c); return f > .2 && f < .8; });
+    if (!pool || !pool.length) pool = cand;
+    if (!pool.length) return;
+    const c = pool[Math.floor(this.rng() * pool.length)];
+    const f = this.frac(c), bits = this.bitsOf(c), a = this.target.ans[c.id];
+    const before = this.remaining();
+    this.applyAnswer(c, a);
+    const share = a ? f : 1 - f;
+    this.log.push({ t: 'wit', id: c.id, a, f, share, bits, cost: 0, q: this.q, before });
+    if (!this.lineup && this.remaining() <= this.lineupAt) this.enterLineup();
+  }
+  enterLineup() {
+    const R = this.sumW() * this.attrFactor();
+    const N = Math.max(1, Math.min(LINEUP_AT, Math.round(R)));
+    // (practice tutorial may enter early with more than 12 left: show 12)
+    const people = [{ ...this.target, alive: true }];
+    const sw = this.sumW();
+    const open = CARDS.filter(c => !this.asked.has(c.id) && this.famOK(c));
+    for (let k = 1; k < N; k++) {
+      for (let tries = 0; tries < 30; tries++) {
+        const cell = sampleIdx(this.w, sw, this.rng);
+        const vals = {};
+        for (const key in this.al) { const a = this.al[key]; vals[key] = sampleIdx(a, a.reduce((x, y) => x + y, 0), this.rng); }
+        const ans = this.answersFor(cell, vals, this.rng, this.target.ans);
+        if (open.some(c => ans[c.id] !== this.target.ans[c.id])) { people.push({ isT: false, cell, vals, ans, alive: true }); break; }
+      }
+    }
+    shuffle(people, this.rng);
+    this.lineup = { people, enteredAt: this.q, R };
+  }
+  guess(idx) {
+    if (this.over || !this.lineup) return null;
+    const p = this.lineup.people[idx];
+    if (!p || !p.alive) return null;
+    if (p.isT) { this.found = true; this.over = true; const e = { t: 'hit', q: this.q, cost: 0 }; this.log.push(e); return e; }
+    p.alive = false; p.outStep = this.log.length; p.missed = true;
+    const e = { t: 'miss', cost: 3, q: this.q };
+    if (this.lastChance) { this.over = true; this.found = false; this.log.push(e); return e; }
+    this.q += 3; e.q = this.q;
+    this.log.push(e);
+    this.hand = this.hand.filter(h => { if (this.splits(CARD_BY[h]) || this.alive().length < 2) return true; this.pile.push(h); return false; });
+    this.deal();
+    this.checkLimit();
+    return e;
+  }
+}
+
+function greedyPlay(seed, deckSeed) {
+  const g = new Game(seed, { deckSeed });
+  let guard = 0;
+  while (!g.over && guard++ < 300) {
+    if (g.lineup) {
+      const al = g.alive();
+      if (al.length === 1) { g.guess(g.lineup.people.indexOf(al[0])); break; }
+    }
+    const opts = [...g.hand]; if (g.hold) opts.push(g.hold);
+    const scored = opts.map(id => { const c = CARD_BY[id]; return { id, s: g.bitsOf(c) / (g.lineup ? 1 : c.cost) }; }).sort((a, b) => b.s - a.s);
+    if (!scored.length || scored[0].s < 1e-6) {
+      if (g.lineup && !CARDS.some(c => g.usable(c) && g.splits(c))) { const al = g.alive(); g.guess(g.lineup.people.indexOf(al[0])); continue; }
+      g.reroll(null); continue;
+    }
+    const best = scored[0].id;
+    const second = scored.find(x => x.id !== best && x.id !== g.hold && g.hand.includes(x.id));
+    g.ask(best, second ? second.id : null);
+  }
+  return g.q;
+}
+function computePar(seed) {
+  const r = [];
+  for (let k = 1; k <= 7; k++) r.push(greedyPlay(seed, seed + k * 101));
+  r.sort((a, b) => a - b);
+  return { par: Math.max(12, r[3]), runs: r };
+}
+if (typeof module !== 'undefined') module.exports = { Game, greedyPlay, computePar, CARDS, CARD_BY, COUNTRIES, MASS0_SUM, NC, mulberry32, hashStr, WORLD_YES };
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const jst = new Date(Date.now() + 9 * 3600e3);
+  const YMD = jst.toISOString().slice(0, 10);
+  const DAILY_NO = Math.floor((Date.parse(YMD) - Date.parse('2026-10-15')) / 864e5) + 1;
+
+  let G, MODE = 'daily', PAR = 30, LIMIT = 42, mark = null, last = null, pendingGuess = null, seed = 0, TUT = null, HINTS = true;
+  const seen = store.get('mitsuketa-seen') || {};
+  function markSeen(k) { seen[k] = 1; store.set('mitsuketa-seen', seen); }
+
+  // ---------- formatting ----------
+  function sig2(n) { if (n < 100) return Math.round(n); const p = Math.pow(10, Math.floor(Math.log10(n)) - 1); return Math.round(n / p) * p; }
+  function fmtPeople(R) {
+    if (R < 0.95) return '1人いるかどうか';
+    if (R >= 1e8) { const v = R / 1e8; return (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + '億人'; }
+    if (R >= 1e4) { const v = R / 1e4; return (v >= 100 ? sig2(v).toLocaleString('ja-JP') : v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + '万人'; }
+    if (R >= 100) return '約' + sig2(R).toLocaleString('ja-JP') + '人';
+    return '約' + Math.round(R) + '人';
+  }
+  const pct = f => Math.round(f * 100) + '%';
+  function splitStr(share) { const a = Math.round(share * 100); return `${a}:${100 - a}`; }
+  function personName(p) { const c = COUNTRIES[Math.floor(p.cell / 32)]; return c.label; }
+  function personDesc(p) { const a = (p.cell >> 2) & 7, s = (p.cell >> 1) & 1, u = p.cell & 1; return `${u ? '都市部' : '農村部'}・${AGE_LABELS[a]}・${s ? '女性' : '男性'}`; }
+  function bdText(v) { const b = BD[v.bd]; return `${b.m + 1}月${b.d}日・${WD[v.wd]}曜日・${v.hr}時${v.mi}分生まれ`; }
+  const yn = a => a ? '<span class="y">はい</span>' : '<span class="nn">いいえ</span>';
+  function ansLabel(c, a) { return c.kind === 'multi' ? c.opts[a] : (a ? 'はい' : 'いいえ'); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+  // ---------- game start ----------
+  function startGame(mode) {
+    MODE = mode;
+    document.body.classList.toggle('tut', mode === 'tutorial');
+    $('modeDaily').classList.toggle('on', mode === 'daily');
+    $('modePractice').classList.toggle('on', mode === 'practice');
+    $('hintTogWrap').hidden = mode !== 'practice';
+    TUT = null; hideCoach();
+    if (mode === 'tutorial') {
+      seed = 20261015; PAR = null; LIMIT = Infinity;
+      G = new Game(seed, { deckSeed: seed, witness: false, lineupAt: 3e6 });
+      TUT = { step: 1, allowed: null };
+    } else {
+      seed = mode === 'daily' ? hashStr('mitsuketa-' + YMD) : (Math.random() * 2 ** 31) >>> 0;
+      PAR = computePar(seed).par;
+      LIMIT = PAR + 12;
+      G = new Game(seed, { deckSeed: seed, limit: LIMIT });
+    }
+    mark = null; last = { t: 'start' };
+    $('modeDaily').textContent = '今日のひとり #' + DAILY_NO;
+    $('endModal').hidden = true;
+    if (TUT) {
+      forceHand(['asia']);
+      coach('<b>ルールはひとつ。</b>質問で82億人を減らしていき、最後のひとりまで絞って、手紙の差出人を当てます。<br>まずは光っているカードを押してみてください。');
+    } else if (!seen.basics) {
+      coach(`<b>パー${PAR}</b>は上手な人の目安の問数です。パー＋12問で夜が明けると見失います。<br>使わなかったカードは「とっておく」で1枚だけ次に残せます。途中で届く<b>手紙の追伸</b>は無料の手がかりです。`, 'basics');
+    }
+    viz.reset();
+    renderAll();
+    const w = G.log.find(e => e.t === 'wit');
+    const introKey = 'intro-' + YMD;
+    if (mode === 'tutorial' || (mode === 'daily' && !seen[introKey])) {
+      if (mode === 'daily') markSeen(introKey);
+      $('introEye').textContent = mode === 'tutorial' ? 'チュートリアル' : `今日のひとり #${DAILY_NO}`;
+      const cl = $('introClue');
+      if (w) { const c = CARD_BY[w.id]; cl.hidden = false; cl.innerHTML = `追伸　「${esc(c.q)}」と聞かれたら、答えは<b>${w.a ? 'はい' : 'いいえ'}</b>です。`; } else cl.hidden = true;
+      $('introModal').hidden = false; $('introGo').focus();
+    } else if (w) showToast(witText(w));
+  }
+  // ---------- coach ----------
+  function coach(html, key) {
+    const el = $('coach');
+    el.innerHTML = `<div>${html}</div>${key ? `<button class="cb" type="button" id="coachOk">わかった</button>` : ''}`;
+    el.hidden = false;
+    if (key) { markSeen(key); $('coachOk').addEventListener('click', hideCoach); }
+  }
+  function hideCoach() { $('coach').hidden = true; }
+  // ---------- tutorial ----------
+  function forceHand(ids) {
+    G.pile.push(...G.hand.filter(h => !ids.includes(h)));
+    G.pile = G.pile.filter(x => !ids.includes(x));
+    G.hand = ids.slice();
+    TUT.allowed = new Set(ids);
+  }
+  function pickBad() {
+    const cand = CARDS.filter(c => c.kind === 'cell' && G.usable(c)).map(c => { const f = G.frac(c); return { id: c.id, m: Math.min(f, 1 - f) }; }).filter(x => x.m > .02 && x.m < .15).sort((a, b) => a.m - b.m);
+    return cand.length ? cand[0].id : 'kanji';
+  }
+  function tutAfter(res) {
+    if (!TUT) return;
+    if (TUT.step === 1 && res && res.t === 'ask') {
+      const bad = pickBad(), good = G.usable(CARD_BY.b_h1) ? 'b_h1' : 'y_even';
+      TUT.step = 2; TUT.good = good;
+      forceHand(Math.random() < .5 ? [bad, good] : [good, bad]);
+      coach(`灯りの<b>${pct(1 - res.share)}</b>が消えました。答えに合わない人が消えるしくみです。<br>では次の2枚、<b>どちらの方が一気に減らせそう？</b>`);
+    } else if (TUT.step === 2 && res && res.t === 'ask') {
+      TUT.step = 3; TUT.allowed = null;
+      const gone = pct(1 - res.share);
+      let msg;
+      if (res.id === TUT.good) msg = `その通り。灯りの<b>${gone}</b>が消えました。<b>ちょうど半分に分かれる質問</b>は、はい・いいえのどちらでも一気に減らせます。`;
+      else if (res.share < .5) msg = `今回は運よく<b>${gone}</b>消えました。でも当てはまる人がかたよった質問は、たいてい少ししか減らせません。<b>半分に分かれる質問</b>が強いです。`;
+      else msg = `灯りは<b>${gone}</b>しか消えませんでした。当てはまる人がかたよった質問は、たいてい少ししか減らせません。<b>半分に分かれる質問</b>が強いです。`;
+      coach(`${msg}<br>ここからは自由に選んでください。カードの下の<b>目安</b>が参考になります。練習なので、残り300万人まで減らすと顔ぶれに進みます。`);
+    } else if (TUT.step === 3 && G.lineup) {
+      TUT.step = 4;
+      coach('<b>顔ぶれ</b>に進みました。この中に差出人がいます。質問でさらに絞るか、これだと思う人をタップして指名してください（外すと＋3問）。');
+    }
+  }
+  function showHints() { return MODE === 'tutorial' ? (TUT && TUT.step >= 3) : MODE === 'practice' && HINTS; }
+  function effectOf(c) {
+    const f = G.frac(c);
+    let lvl;
+    if (c.kind === 'multi') { const h = HD(f) / c.cost; lvl = h < 1e-6 ? 0 : h >= .9 ? 3 : h >= .6 ? 2 : 1; }
+    else { const m = Math.min(f, 1 - f); lvl = m < 1e-9 ? 0 : m >= .35 ? 3 : m >= .15 ? 2 : 1; }
+    return { lvl, text: [G.lineup ? 'この顔ぶれでは減らない' : '減らない', 'あまり減らない', 'そこそこ減らせる', '半分くらい減らせる'][lvl] };
+  }
+  function witText(e) { const c = CARD_BY[e.id]; return `<b>手紙の追伸</b>　「${esc(c.q)}」→ ${e.a ? 'はい' : 'いいえ'}`; }
+
+  // ---------- actions ----------
+  function doAsk(id) {
+    const n0 = G.log.length;
+    if (TUT && TUT.allowed && !TUT.allowed.has(id)) return;
+    const res = G.ask(id, mark);
+    if (!res) return;
+    if (!TUT) hideCoach();
+    mark = null; last = res;
+    afterAction(n0, CARD_BY[id].geo);
+  }
+  function doReroll() {
+    const n0 = G.log.length;
+    if (!G.reroll(mark)) return;
+    mark = null; last = { t: 'reroll' };
+    afterAction(n0, false);
+  }
+  function afterAction(n0, geo) {
+    const wits = G.log.slice(n0).filter(e => e.t === 'wit');
+    viz.update(geo);
+    tutAfter(last);
+    renderAll();
+    if (wits.length) setTimeout(() => showToast(witText(wits[wits.length - 1])), 500);
+    if (G.over) setTimeout(showEnd, 1300);
+  }
+  function openGuess(i) {
+    const p = G.lineup.people[i];
+    pendingGuess = i;
+    $('guessWho').innerHTML = `<b>${esc(personName(p))}</b>　${esc(personDesc(p))}`;
+    const n = G.alive().length;
+    $('guessOdds').textContent = G.lastChance ? `最後の指名です。当たる確率は 1/${n}。` : `いま当たる確率は 1/${n}。外れると＋3問です。`;
+    $('guessModal').hidden = false;
+    $('guessYes').focus();
+  }
+  function doGuess() {
+    $('guessModal').hidden = true;
+    if (pendingGuess == null) return;
+    const res = G.guess(pendingGuess);
+    pendingGuess = null;
+    if (!res) return;
+    last = res;
+    viz.update(false);
+    renderAll();
+    if (!TUT && G.lineup && !G.over) hideCoach();
+    if (G.over) setTimeout(showEnd, res.t === 'hit' ? 900 : 1300);
+  }
+
+  // ---------- toast ----------
+  let toastT = 0;
+  function showToast(html) {
+    const t = $('toast'); t.innerHTML = html; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 4200);
+  }
+
+  // ---------- render ----------
+  function renderAll() { renderHud(); renderMeter(); renderCrowd(); renderAnswer(); renderLineup(); renderHand(); renderLog(); }
+  function renderHud() {
+    const R = G.remaining();
+    $('count').textContent = G.lineup ? `残り ${R}人` : fmtPeople(R);
+    $('phase').textContent = viz.phaseName();
+    $('per').textContent = viz.perText();
+    const p = G.found ? 1 : Math.min(1, Math.max(0, 1 - Math.log(Math.max(1, R)) / Math.log(MASS0_SUM)));
+    $('progBar').style.width = (p * 100).toFixed(1) + '%';
+    $('progTxt').textContent = G.found ? '発見！' : G.lineup ? `残り${R}人 → 1人` : `いま ${fmtPeople(R)} → 1人`;
+  }
+  function renderMeter() {
+    $('qNow').textContent = G.q;
+    $('par').textContent = PAR;
+    const left = Math.max(0, LIMIT - G.q);
+    $('dawn').textContent = left + '問';
+    $('dawnBox').classList.toggle('warn', left <= 5);
+  }
+  function renderCrowd() {
+    let shares = new Array(COUNTRIES.length).fill(0), ages = new Array(8).fill(0), urb = 0, tot = 0;
+    if (G.lineup) {
+      for (const p of G.alive()) { const c = Math.floor(p.cell / 32); shares[c]++; ages[(p.cell >> 2) & 7]++; urb += p.cell & 1; tot++; }
+    } else {
+      const w = G.w;
+      for (let i = 0; i < w.length; i++) { const v = w[i]; if (!v) continue; shares[i >> 5] += v; ages[(i >> 2) & 7] += v; if (i & 1) urb += v; tot += v; }
+    }
+    const top = shares.map((v, i) => [i, v]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const amax = Math.max(...ages, 1e-12);
+    $('crowd').innerHTML = `<div><h3>群衆の顔ぶれ（国・地域）</h3>${top.map(([i, v]) => `<div class="crow"><span class="nm">${esc(COUNTRIES[i].group ? COUNTRIES[i].name : COUNTRIES[i].name)}</span><span class="bar"><i style="width:${(v / tot * 100).toFixed(1)}%"></i></span><span class="pc">${pct(v / tot)}</span></div>`).join('')}</div>
+      <div><h3>年代</h3><div class="ages">${ages.map(v => `<i style="height:${(v / amax * 100).toFixed(1)}%"></i>`).join('')}</div><div class="agel"><span>0歳</span><span>40</span><span>70+</span></div>
+      <div class="urb">都市部 ${pct(urb / (tot || 1))}・農村部 ${pct(1 - urb / (tot || 1))}<div class="bar"><i style="width:${(urb / (tot || 1) * 100).toFixed(1)}%"></i></div></div></div>`;
+  }
+  function renderAnswer() {
+    const el = $('answer');
+    if (!last || last.t === 'start') {
+      const w = G.log.find(e => e.t === 'wit');
+      el.innerHTML = `<div class="aq">${MODE === 'daily' ? `今日のひとり #${DAILY_NO}` : MODE === 'practice' ? '練習' : 'チュートリアル'}</div><div class="av">手紙の差出人は、<br>82億人のうちのだれ？</div><div class="ad">手札から質問を1枚えらんでください。${w ? `追伸：「${esc(CARD_BY[w.id].q)}」→ ${w.a ? 'はい' : 'いいえ'}` : ''}</div>`;
+      return;
+    }
+    if (last.t === 'ask') {
+      const c = CARD_BY[last.id];
+      const world = WORLD_YES[c.id];
+      const removed = last.before - last.afterR;
+      const lineupNow = G.lineup && G.lineup.enteredAt < last.q;
+      let detail;
+      if (lineupNow) detail = `顔ぶれのうち <b>${Math.round(removed)}人</b> の灯りが消えた`;
+      else detail = `灯りの <b>${pct(1 - last.share)}</b> が消えた（${splitStr(last.share)}で分かれた）${world != null && c.kind !== 'multi' && MODE !== 'tutorial' ? `・82億人全体では「はい」が <b>${pct(world)}</b>` : ''}`;
+      el.innerHTML = `<div class="aq">${esc(c.q)}</div><div class="av ${c.kind === 'multi' ? '' : last.a ? 'yes' : 'no'}">${esc(ansLabel(c, last.a))}</div><div class="ad">${detail}</div>`;
+    } else if (last.t === 'reroll') {
+      el.innerHTML = `<div class="aq">引き直し</div><div class="av">新しい3枚</div><div class="ad">1問ぶん使いました</div>`;
+    } else if (last.t === 'miss') {
+      el.innerHTML = `<div class="aq">指名</div><div class="av no">ちがった</div><div class="ad">${G.over ? '' : '＋3問。その人は差出人ではありませんでした'}</div>`;
+    } else if (last.t === 'hit') {
+      el.innerHTML = `<div class="aq">指名</div><div class="av yes">ミツケタ</div><div class="ad">82億人の中から、手紙の差出人を見つけました</div>`;
+    }
+  }
+  function renderLineup() {
+    const el = $('lineup');
+    if (!G.lineup) { el.hidden = true; return; }
+    el.hidden = false;
+    if (!TUT && !seen.lineup) coach('<b>顔ぶれ</b>に進みました。光っている人の中に差出人がいます。質問でさらに絞るか、タップして指名します（外すと＋3問）。', 'lineup');
+    const n = G.alive().length;
+    el.innerHTML = `<h2>顔ぶれ</h2><p>${n === 1 ? '残りはひとり。灯りをタップして指名してください。' : `残り${n}人。質問でさらに絞るか、これだと思う人を指名します（外すと＋3問）。`}</p><div class="people">${G.lineup.people.map((p, i) => `<button class="person${p.missed ? ' miss' : ''}" type="button" data-i="${i}" ${p.alive && !G.over ? '' : 'disabled'}><span class="dot"></span><span class="pn">${esc(personName(p))}</span><span class="pd">${esc(personDesc(p))}</span></button>`).join('')}</div>`;
+    el.querySelectorAll('.person').forEach(b => b.addEventListener('click', () => openGuess(+b.dataset.i)));
+  }
+  function cardHTML(id, where) {
+    const c = CARD_BY[id];
+    const locked = TUT && TUT.allowed && !TUT.allowed.has(id);
+    const dis = G.over || G.lastChance || locked;
+    const spot = TUT && TUT.step === 1 && !locked;
+    let eff = '';
+    if (showHints()) { const e = effectOf(c); eff = `<span class="eff l${e.lvl}"><span class="m"><i></i><i></i><i></i></span>${e.text}</span>`; }
+    const pin = where === 'hand' && !TUT ? `<button class="pin" type="button" data-pin="${id}" aria-pressed="${mark === id}" ${dis ? 'disabled' : ''}>${mark === id ? 'とっておく ✓' : 'とっておく'}</button>` : '';
+    return `<div class="qwrap${where === 'hand' && !TUT ? '' : ' solo'}"><button class="qcard${spot ? ' spot' : ''}" type="button" data-ask="${id}" ${dis ? 'disabled' : ''}><span class="tag ${c.cat}">${c.cat}</span><span class="qq">${esc(c.q)}</span>${c.hint ? `<span class="qh">${esc(c.hint)}</span>` : ''}${c.cost > 1 ? `<span class="cost">${c.cost}問ぶん</span>` : ''}${eff}</button>${pin}</div>`;
+  }
+  function renderHand() {
+    const hand = $('hand');
+    hand.innerHTML = G.hand.length ? G.hand.map(id => cardHTML(id, 'hand')).join('') : '<p style="color:var(--muted);font-size:13px">使えるカードがありません。引き直すか指名してください。</p>';
+    $('hold').innerHTML = G.hold ? cardHTML(G.hold, 'hold') : '<div class="empty">手札の「とっておく」で、使わなかった1枚を次の手番に残せます。</div>';
+    document.querySelectorAll('[data-ask]').forEach(b => b.addEventListener('click', () => doAsk(b.dataset.ask)));
+    document.querySelectorAll('[data-pin]').forEach(b => b.addEventListener('click', () => { mark = mark === b.dataset.pin ? null : b.dataset.pin; renderHand(); }));
+    $('reroll').disabled = G.over || G.lastChance;
+    const nt = $('notice');
+    if (G.lastChance && !G.over) { nt.hidden = false; nt.textContent = '夜が明けはじめました。質問はもうできません。最後の指名を1回だけどうぞ。'; }
+    else nt.hidden = true;
+  }
+  function logMark(e) {
+    if (e.t === 'wit') return '⭐';
+    if (e.t === 'reroll') return '🔄';
+    if (e.t === 'miss') return '❌';
+    if (e.t === 'hit') return '🎯';
+    if (CARD_BY[e.id].kind === 'multi') return '🟪';
+    const s = e.share;
+    return (s >= .45 && s <= .55) ? '🟩' : (s >= .3 && s <= .7) ? '🟨' : '🟥';
+  }
+  function renderLog() {
+    $('log').innerHTML = G.log.map(e => {
+      if (e.t === 'ask' || e.t === 'wit') { const c = CARD_BY[e.id]; return `<li><span class="n">${e.t === 'wit' ? '追伸' : e.q}</span><span>${logMark(e)}</span><span>${esc(c.q)} → ${c.kind === 'multi' ? esc(c.opts[e.a]) : yn(e.a)}</span><span class="r">${G.lineup && G.lineup.enteredAt < e.q && e.t === 'ask' ? '' : splitStr(e.share)}</span></li>`; }
+      if (e.t === 'reroll') return `<li><span class="n">${e.q}</span><span>🔄</span><span>引き直し</span><span></span></li>`;
+      if (e.t === 'miss') return `<li><span class="n">${e.q}</span><span>❌</span><span>指名がはずれた</span><span></span></li>`;
+      return `<li><span class="n">${e.q}</span><span>🎯</span><span>指名して発見</span><span></span></li>`;
+    }).join('');
+  }
+
+  // ---------- end ----------
+  function efficiency() {
+    let b = 0, c = 0;
+    for (const e of G.log) { if (e.t === 'ask') { b += e.bits; c += e.cost; } else if (e.t === 'reroll') c += 1; }
+    return c ? Math.min(100, Math.round(b / c * 100)) : 0;
+  }
+  function showEnd() {
+    const t = G.target, c = COUNTRIES[Math.floor(t.cell / 32)];
+    const diff = G.q - PAR, dtx = diff === 0 ? '±0' : diff > 0 ? '+' + diff : '−' + (-diff);
+    const head = MODE === 'daily' ? `ミツケタ #${DAILY_NO}` : 'ミツケタ（練習）';
+    const scoreLine = G.found ? `${head}｜差出人を${G.q}問で発見（パー${PAR} ${dtx}）` : `${head}｜夜が明けて見失った（パー${PAR}）`;
+    const tut = MODE === 'tutorial';
+    $('goDaily').hidden = !tut; $('copyBtn').hidden = tut; $('shareText').hidden = tut;
+    if (tut) { store.set('mitsuketa-tut', 1); hideCoach(); }
+    $('endTitle').textContent = tut ? '差出人をミツケタ！ 遊び方はこれでおしまい' : G.found ? '差出人をミツケタ' : '夜が明けた';
+    $('endTitle').className = G.found ? '' : 'lost';
+    $('endScore').textContent = tut ? `${G.q}問で見つけました。本番は82億人から最後のひとりまで、30問前後の勝負です。` : `${G.found ? `${G.q}問で発見` : '見失いました'}　パー${PAR}　割れ方のうまさ ${efficiency()}%`;
+    const same = MASS0[t.cell];
+    const life = ['net', 'ele', 'wat', 'agr'];
+    const lifeTxt = { net: ['インターネット', '使っている', '使っていない'], ele: ['家の電気', '来ている', '来ていない'], wat: ['安全な飲み水', '家で使える', '家では使えない'], agr: ['農林水産業', '働いている', '働いていない'] };
+    $('endProf').innerHTML = `<div class="fine">手紙の差出人は</div><div class="pn">${esc(c.label)}　${esc(personDesc(t))}</div>
+      <dl><dt>生まれ</dt><dd>${esc(bdText(t.vals))}（下1桁が${t.vals.yd}の年）</dd>
+      ${life.map(k => `<dt>${lifeTxt[k][0]}</dt><dd>${t.ans[k] ? lifeTxt[k][1] : lifeTxt[k][2]}</dd>`).join('')}
+      <dt>同じ条件の人</dt><dd>同じ国・地域、年代、性別、都市/農村の人は ${fmtPeople(same)}</dd></dl>
+      <div class="fine">統計から生成した、実在しない「いそうな誰か」です。</div>`;
+    const marks = G.log.map(logMark).join('');
+    const share = `${scoreLine}\n${marks}\n割れ方のうまさ ${efficiency()}%\n#ミツケタ 82億人のかくれんぼ`;
+    $('shareText').textContent = share;
+    $('copyMsg').textContent = '';
+    $('endModal').hidden = false;
+    if (MODE === 'daily') {
+      const rec = store.get('mitsuketa-daily') || {};
+      if (!rec[YMD]) { rec[YMD] = { q: G.q, par: PAR, found: G.found }; store.set('mitsuketa-daily', rec); }
+    }
+  }
+  $('copyBtn').addEventListener('click', () => {
+    const txt = $('shareText').textContent;
+    const ok = () => { $('copyMsg').textContent = 'コピーしました。SNSやLINEに貼り付けてください。'; };
+    const fail = () => { const r = document.createRange(); r.selectNodeContents($('shareText')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('copyMsg').textContent = '選択しました。コピーして貼り付けてください。'; };
+    try { navigator.clipboard.writeText(txt).then(ok, fail); } catch (e) { fail(); }
+  });
+  $('againBtn').addEventListener('click', () => startGame('practice'));
+  $('introGo').addEventListener('click', () => { $('introModal').hidden = true; const w = G.log.find(e => e.t === 'wit'); if (w && MODE !== 'tutorial') showToast(witText(w)); });
+  $('goDaily').addEventListener('click', () => startGame('daily'));
+  $('hintTog').addEventListener('change', e => { HINTS = e.target.checked; renderHand(); });
+  $('helpTut').addEventListener('click', () => { $('helpModal').hidden = true; startGame('tutorial'); });
+  $('closeEnd').addEventListener('click', () => { $('endModal').hidden = true; });
+  $('guessYes').addEventListener('click', doGuess);
+  $('guessNo').addEventListener('click', () => { $('guessModal').hidden = true; pendingGuess = null; });
+  $('reroll').addEventListener('click', doReroll);
+  $('modeDaily').addEventListener('click', () => startGame('daily'));
+  $('modePractice').addEventListener('click', () => startGame('practice'));
+  $('helpBtn').addEventListener('click', () => { $('helpModal').hidden = false; $('helpClose').focus(); });
+  $('helpClose').addEventListener('click', () => { $('helpModal').hidden = true; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('helpModal').hidden = true; $('introModal').hidden = true; $('guessModal').hidden = true; pendingGuess = null; } });
+
+  // ---------- visualization ----------
+  const viz = (() => {
+    const cv = $('cv'), gl = $('glow'), ctx = cv.getContext('2d'), gtx = gl.getContext('2d');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const LON0 = -128, LON1 = 178, LAT0 = 62, LAT1 = -46;
+    const proj = (lat, lon) => [(lon - LON0) / (LON1 - LON0), (LAT0 - lat) / (LAT0 - LAT1)];
+    const NG = COUNTRIES.length * 2;
+    const gm0 = new Float64Array(NG);
+    for (let i = 0; i < NC; i++) gm0[(i >> 5) * 2 + (i & 1)] += MASS0[i];
+    // map dots (fixed layout)
+    const NM = 18000;
+    const mx = new Float32Array(NM), my = new Float32Array(NM), mg = new Uint16Array(NM), mr = new Float32Array(NM);
+    {
+      const rng = mulberry32(20261015);
+      const cum = []; let s = 0; for (let g = 0; g < NG; g++) { s += gm0[g]; cum.push(s); }
+      const gauss = () => { let u = 0, v = 0; while (!u) u = rng(); v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+      for (let k = 0; k < NM; k++) {
+        const r = rng() * s; let g = 0; while (cum[g] < r) g++;
+        const C = COUNTRIES[g >> 1], urban = g & 1;
+        const aw = C.anchors.reduce((t, a) => t + a[2], 0);
+        let x, y, ok = false;
+        for (let tr = 0; tr < 6 && !ok; tr++) {
+          let q = rng() * aw, a = C.anchors[0];
+          for (const an of C.anchors) { q -= an[2]; if (q <= 0) { a = an; break; } }
+          const sd = C.spread * (urban ? .3 : .95);
+          [x, y] = proj(a[0] + gauss() * sd, a[1] + gauss() * sd * 1.2);
+          ok = x > .004 && x < .996 && y > .004 && y < .996;
+        }
+        mx[k] = x; my[k] = y; mg[k] = g; mr[k] = rng();
+      }
+    }
+    let mode = 'map';
+    let px, py, pg, pr, pN = 0, base = null, baseA = 1, perPlaza = 1, labels = [];
+    let offAt = new Float64Array(NM).fill(Infinity);
+    let trans = null, anim = 0, pendingSwitch = 0;
+    let W = 0, H = 0, dpr = 1;
+    const COL_U = '#ffd27a', COL_R = '#e0ac62', COL_BG = '#090e1d';
+
+    function resize() {
+      const r = cv.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = Math.max(1, Math.round(r.width * dpr)); H = Math.max(1, Math.round(r.height * dpr));
+      cv.width = W; cv.height = H; gl.width = Math.round(W / 2); gl.height = Math.round(H / 2);
+      draw(performance.now());
+    }
+    function groupMass() {
+      const gm = new Float64Array(NG), w = G.w;
+      for (let i = 0; i < NC; i++) gm[(i >> 5) * 2 + (i & 1)] += w[i];
+      return gm;
+    }
+    function reset() {
+      mode = 'map'; offAt = new Float64Array(NM).fill(Infinity); trans = null; clearTimeout(pendingSwitch);
+      update(false, true);
+    }
+    function regroup(now) {
+      const R = G.remaining();
+      const gm = groupMass();
+      const N = R >= 3000 ? 3000 : Math.max(13, Math.round(R));
+      // allocate dots to groups by mass (largest remainder)
+      const tot = gm.reduce((a, b) => a + b, 0);
+      const order = [...Array(NG).keys()].filter(g => gm[g] > 0).sort((a, b) => (COUNTRIES[a >> 1].ropt - COUNTRIES[b >> 1].ropt) || (gm[b >> 1 << 1] + gm[(b >> 1 << 1) + 1] - gm[a >> 1 << 1] - gm[(a >> 1 << 1) + 1]) || (a - b));
+      const want = order.map(g => gm[g] / tot * N);
+      const cnt = want.map(Math.floor); let left = N - cnt.reduce((a, b) => a + b, 0);
+      want.map((v, i) => [v - cnt[i], i]).sort((a, b) => b[0] - a[0]).slice(0, left).forEach(([, i]) => cnt[i]++);
+      // phyllotaxis points, sorted by angle → sectors
+      const pts = [];
+      for (let i = 0; i < N; i++) { const rr = Math.sqrt((i + .5) / N) * .46, th = i * 2.399963; pts.push([rr * Math.cos(th), rr * Math.sin(th), Math.atan2(Math.sin(th), Math.cos(th))]); }
+      pts.sort((a, b) => a[2] - b[2]);
+      const ox = new Float32Array(N), oy = new Float32Array(N), og = new Uint16Array(N), orr = new Float32Array(N);
+      const rng = mulberry32((G.seed + G.q * 31) >>> 0);
+      let k = 0; labels = [];
+      order.forEach((g, gi) => {
+        const start = k;
+        for (let j = 0; j < cnt[gi]; j++, k++) { ox[k] = pts[k][0]; oy[k] = pts[k][1]; og[k] = g; orr[k] = rng(); }
+        if (cnt[gi] > 0) labels.push({ g, a0: pts[start][2], a1: pts[k - 1][2], n: cnt[gi] });
+      });
+      // merge labels by country and keep the biggest
+      const byC = {};
+      for (const L of labels) { const c = L.g >> 1; if (!byC[c]) byC[c] = { c, a0: L.a0, a1: L.a1, n: 0 }; byC[c].a0 = Math.min(byC[c].a0, L.a0); byC[c].a1 = Math.max(byC[c].a1, L.a1); byC[c].n += L.n; }
+      labels = Object.values(byC).sort((a, b) => b.n - a.n).slice(0, 5).filter(L => L.n / N > .04);
+      // transition: old visible dots collapse to center
+      const old = snapshot(now);
+      px = ox; py = oy; pg = og; pr = orr; pN = N; base = gm; baseA = G.attrFactor(); perPlaza = R / N;
+      offAt = new Float64Array(N).fill(Infinity);
+      mode = 'plaza';
+      trans = { t0: now, old };
+      kick();
+    }
+    function snapshot(now) {
+      const pts = [];
+      const n = mode === 'map' ? NM : pN;
+      for (let i = 0; i < n; i++) if (offAt[i] === Infinity) { const [x, y] = pos(i); pts.push(x, y); }
+      return pts;
+    }
+    function pos(i) {
+      if (mode === 'map') return [mx[i] * W, my[i] * H];
+      const m = Math.min(W, H);
+      return [W / 2 + px[i] * m * 1.55, H / 2 + 10 * dpr + py[i] * m];
+    }
+    function frac(g) {
+      if (mode === 'map') return gm0[g] > 0 ? CUR.gm[g] / gm0[g] * CUR.A : 0;
+      return base[g] > 0 ? (CUR.gm[g] / base[g]) * (CUR.A / baseA) : 0;
+    }
+    const CUR = { gm: null, A: 1 };
+    function update(geo, instant) {
+      const now = performance.now();
+      if (mode === 'lineup' || G.lineup && mode !== 'lineup' && instant) { if (G.lineup) mode = 'lineup'; draw(now); kick(); return; }
+      CUR.gm = groupMass(); CUR.A = G.attrFactor();
+      const n = mode === 'map' ? NM : pN;
+      const gArr = mode === 'map' ? mg : pg, rArr = mode === 'map' ? mr : pr, xArr = mode === 'map' ? mx : null;
+      let vis = 0;
+      for (let i = 0; i < n; i++) {
+        if (offAt[i] !== Infinity) continue;
+        if (rArr[i] >= frac(gArr[i])) offAt[i] = instant || reduce ? now - 1000 : now + (geo && mode === 'map' ? xArr[i] * 520 : Math.random() * 380);
+        else vis++;
+      }
+      clearTimeout(pendingSwitch);
+      if (G.lineup) pendingSwitch = setTimeout(() => { mode = 'lineup'; trans = { t0: performance.now(), old: snapshot(performance.now()) }; renderHud(); kick(); }, instant ? 0 : 900);
+      else if (vis < (mode === 'map' ? 300 : 150) && G.remaining() > G.lineupAt) pendingSwitch = setTimeout(() => { regroup(performance.now()); renderHud(); }, instant ? 0 : 950);
+      kick();
+    }
+    function kick() { if (!anim) anim = requestAnimationFrame(loop); }
+    function loop(now) {
+      anim = 0;
+      const busy = draw(now);
+      if (busy) kick();
+    }
+    function draw(now) {
+      if (!W) return false;
+      ctx.fillStyle = COL_BG; ctx.fillRect(0, 0, W, H);
+      let busy = false;
+      if (mode === 'map') {
+        // latitude guides: equator & tropics
+        ctx.save(); ctx.strokeStyle = 'rgba(144,151,173,.18)'; ctx.setLineDash([4 * dpr, 6 * dpr]); ctx.lineWidth = 1 * dpr;
+        ctx.fillStyle = 'rgba(144,151,173,.45)'; ctx.font = `${10 * dpr}px "BIZ UDPGothic", sans-serif`;
+        for (const [lat, nm] of [[23.44, '北回帰線'], [0, '赤道'], [-23.44, '南回帰線']]) { const y = proj(lat, 0)[1] * H; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(nm, W - 52 * dpr, y - 3 * dpr); }
+        ctx.restore();
+      }
+      if (mode === 'map' || mode === 'plaza') {
+        const n = mode === 'map' ? NM : pN;
+        const sz = (mode === 'map' ? 1.5 : pN > 2000 ? 2.2 : pN > 600 ? 3 : pN > 120 ? 4.5 : 7) * dpr;
+        const gArr = mode === 'map' ? mg : pg;
+        let tIn = 1;
+        if (trans) { tIn = Math.min(1, (now - trans.t0) / 900); if (tIn < 1) busy = true; }
+        const e = 1 - Math.pow(1 - tIn, 3);
+        const cx = W / 2, cy = H / 2;
+        if (trans && tIn < 1 && trans.old) {
+          ctx.fillStyle = COL_U; ctx.globalAlpha = 1 - e;
+          const o = trans.old; const s0 = 1.6 * dpr;
+          for (let i = 0; i < o.length; i += 2) { const x = o[i] + (cx - o[i]) * e, y = o[i + 1] + (cy - o[i + 1]) * e; ctx.fillRect(x - s0 / 2, y - s0 / 2, s0, s0); }
+          ctx.globalAlpha = 1;
+        }
+        for (const pass of [0, 1]) {
+          ctx.fillStyle = pass ? COL_U : COL_R;
+          for (let i = 0; i < n; i++) {
+            if ((gArr[i] & 1) !== pass) continue;
+            const off = offAt[i];
+            let a = 1;
+            if (off !== Infinity) { if (now >= off + 420) continue; if (now > off) a = 1 - (now - off) / 420; busy = true; }
+            let [x, y] = pos(i);
+            if (trans && tIn < 1 && mode === 'plaza') { x = cx + (x - cx) * e; y = cy + (y - cy) * e; }
+            if (a < 1 || tIn < 1) ctx.globalAlpha = a * (mode === 'plaza' ? Math.max(.15, e) : 1);
+            ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+            if (a < 1 || tIn < 1) ctx.globalAlpha = 1;
+          }
+        }
+        if (mode === 'plaza' && tIn >= 1) {
+          ctx.fillStyle = 'rgba(235,229,213,.75)'; ctx.font = `${11 * dpr}px "BIZ UDPGothic", sans-serif`; ctx.textAlign = 'center';
+          const m = Math.min(W, H);
+          for (const L of labels) { const a = (L.a0 + L.a1) / 2; const x = W / 2 + Math.cos(a) * .5 * m * 1.55, y = H / 2 + 10 * dpr + Math.sin(a) * .5 * m; ctx.fillText(COUNTRIES[L.c].name, Math.min(W - 40 * dpr, Math.max(40 * dpr, x)), Math.min(H - 6 * dpr, Math.max(16 * dpr, y))); }
+          ctx.textAlign = 'start';
+        }
+      } else if (mode === 'lineup' && G.lineup) {
+        const ppl = G.lineup.people, n = ppl.length, m = Math.min(W, H);
+        let tIn = 1; if (trans) { tIn = Math.min(1, (now - trans.t0) / 900); if (tIn < 1) busy = true; }
+        const e = 1 - Math.pow(1 - tIn, 3);
+        if (trans && trans.old && tIn < 1) { ctx.fillStyle = COL_U; ctx.globalAlpha = 1 - e; const o = trans.old; for (let i = 0; i < o.length; i += 2) { const x = o[i] + (W / 2 - o[i]) * e, y = o[i + 1] + (H / 2 - o[i + 1]) * e; ctx.fillRect(x - 2, y - 2, 4, 4); } ctx.globalAlpha = 1; }
+        ppl.forEach((p, i) => {
+          const ang = -Math.PI / 2 + i / n * Math.PI * 2;
+          const rad = n === 1 ? 0 : m * .3 * e;
+          const x = W / 2 + Math.cos(ang) * rad * 1.5, y = H / 2 + 14 * dpr + Math.sin(ang) * rad;
+          const win = G.over && G.found && p.isT;
+          const r = (win ? 16 : 9) * dpr;
+          if (p.alive || win) {
+            const grd = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+            grd.addColorStop(0, 'rgba(255,226,166,.95)'); grd.addColorStop(.35, 'rgba(255,199,100,.45)'); grd.addColorStop(1, 'rgba(255,199,100,0)');
+            ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff3d6'; ctx.beginPath(); ctx.arc(x, y, r * .45, 0, Math.PI * 2); ctx.fill();
+          } else {
+            ctx.strokeStyle = 'rgba(144,151,173,.35)'; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, r * .5, 0, Math.PI * 2); ctx.stroke();
+          }
+        });
+      }
+      gtx.clearRect(0, 0, gl.width, gl.height);
+      gtx.drawImage(cv, 0, 0, gl.width, gl.height);
+      return busy;
+    }
+    function phaseName() { return mode === 'map' ? '地球' : mode === 'plaza' ? '広場' : '顔ぶれ'; }
+    function perText() {
+      if (mode === 'map') return '1つの灯り ≈ ' + fmtPeople(MASS0_SUM / NM);
+      if (mode === 'plaza') return perPlaza < 1.5 ? '1つの灯り ＝ 1人' : '1つの灯り ≈ ' + fmtPeople(perPlaza);
+      return '1つの灯り ＝ 1人';
+    }
+    new ResizeObserver(resize).observe($('sky'));
+    return { reset, update, phaseName, perText, resize };
+  })();
+
+  startGame(store.get('mitsuketa-tut') ? 'daily' : 'tutorial');
+})();
+</script>
+
+</body>
+</html>
